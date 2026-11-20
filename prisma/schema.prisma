@@ -1,0 +1,440 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ProjectStatus {
+  Idea
+  InProgress
+  InReview
+  Completed
+}
+
+enum Visibility {
+  Private
+  CollaboratorsOnly
+  Public
+}
+
+enum CollaboratorRole {
+  Owner
+  Collaborator
+  ClientReviewer
+}
+
+enum InvitationStatus {
+  Pending
+  Accepted
+  Rejected
+  Cancelled
+}
+
+enum VersionStatus {
+  Draft
+  Approved
+  Final
+  Rejected
+}
+
+enum NotificationType {
+  Invitation
+  InvitationAccepted
+  InvitationRejected
+  InvitationCancelled
+  CollaboratorRemoved
+  Comment
+  Approval
+  Rejection
+  ConnectionRequest
+  ConnectionAccepted
+  Reply
+  Like
+  Follow
+}
+
+enum ActivityType {
+  ProjectPublished
+  VersionPublished
+  VersionFinalized
+  PortfolioPublished
+}
+
+enum ConnectionStatus {
+  Pending
+  Accepted
+  Rejected
+}
+
+enum SocialPrivacy {
+  Public
+  ConnectionsOnly
+  Private
+}
+
+enum ReportTargetType {
+  Project
+  User
+  Comment
+}
+
+enum ReportStatus {
+  Open
+  Resolved
+  Dismissed
+}
+
+enum UploadIntentStatus {
+  Pending
+  Registered
+  CleaningUp
+  CleanedUp
+}
+
+model User {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  passwordHash  String?
+  username      String        @unique
+  displayName   String
+  bio           String?
+  avatarUrl     String?
+  disciplines   Json          @default("[]")
+  socialLinks   Json?
+  socialPrivacy SocialPrivacy @default(Public)
+  isAdmin       Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  createdProjects     Project[]             @relation("ProjectCreator")
+  collaborations      ProjectCollaborator[] @relation("CollaborationMember")
+  sentInvitations     ProjectCollaborator[] @relation("CollaborationInviter")
+  assets              Asset[]
+  uploadIntents       UploadIntent[]
+  versions            Version[]
+  comments            Comment[]
+  portfolio           Portfolio?
+  following           Follow[]              @relation("UserFollower")
+  followers           Follow[]              @relation("UserFollowing")
+  sentConnections     Connection[]          @relation("ConnectionRequester")
+  receivedConnections Connection[]          @relation("ConnectionReceiver")
+  likes               Like[]
+  commentLikes        CommentLike[]
+  notifications       Notification[]        @relation("NotificationRecipient")
+  actedNotifications  Notification[]        @relation("NotificationActor")
+  activities          Activity[]
+  reports             Report[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  creatorId   String
+  creator     User          @relation("ProjectCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  title       String
+  description String?
+  category    String
+  status      ProjectStatus @default(Idea)
+  visibility  Visibility    @default(Private)
+  metadata    Json          @default("{}")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  collaborators     ProjectCollaborator[]
+  assets            Asset[]
+  uploadIntents     UploadIntent[]
+  versions          Version[]
+  comments          Comment[]
+  portfolioProjects PortfolioProject[]
+  likes             Like[]
+  projectTags       ProjectTag[]
+  notifications     Notification[]
+  activities        Activity[]
+
+  @@index([creatorId])
+  @@index([category])
+  @@index([visibility])
+  @@map("projects")
+}
+
+model ProjectCollaborator {
+  id          String           @id @default(uuid())
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User             @relation("CollaborationMember", fields: [userId], references: [id], onDelete: Cascade)
+  invitedById String?
+  invitedBy   User?            @relation("CollaborationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  role        CollaboratorRole
+  status      InvitationStatus @default(Pending)
+  invitedAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+  rejectedAt  DateTime?
+  cancelledAt DateTime?
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([projectId, status])
+  @@map("project_collaborators")
+}
+
+model Asset {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploaderId    String
+  uploader      User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  versionId     String?
+  version       Version? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  fileName      String
+  mimeType      String
+  fileSize      Int
+  storagePath   String   @unique
+  thumbnailPath String?
+  createdAt     DateTime @default(now())
+
+  @@index([projectId])
+  @@index([versionId])
+  @@map("assets")
+}
+
+model UploadIntent {
+  id          String             @id @default(uuid())
+  projectId   String
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploaderId  String
+  uploader    User               @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  storagePath String             @unique
+  mimeType    String
+  fileSize    Int
+  status      UploadIntentStatus @default(Pending)
+  expiresAt   DateTime
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([projectId, status])
+  @@index([uploaderId, status])
+  @@index([status, expiresAt])
+  @@map("upload_intents")
+}
+
+model Version {
+  id            String        @id @default(uuid())
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  createdById   String
+  createdBy     User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  status        VersionStatus @default(Draft)
+  createdAt     DateTime      @default(now())
+
+  assets        Asset[]
+  comments      Comment[]
+  notifications Notification[]
+  activities    Activity[]
+
+  @@unique([projectId, versionNumber])
+  @@map("versions")
+}
+
+model Comment {
+  id        String        @id @default(uuid())
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionId String?
+  version   Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies   Comment[]     @relation("CommentReplies")
+  content   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+
+  likes         CommentLike[]
+  notifications Notification[]
+
+  @@index([projectId])
+  @@index([versionId])
+  @@index([parentId])
+  @@index([projectId, versionId, parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(uuid())
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_likes")
+}
+
+model Portfolio {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customSlug String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  portfolioProjects PortfolioProject[]
+
+  @@map("portfolios")
+}
+
+model PortfolioProject {
+  id           String    @id @default(uuid())
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  featured     Boolean   @default(false)
+  displayOrder Int       @default(0)
+
+  @@unique([portfolioId, projectId])
+  @@map("portfolio_projects")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  follower    User     @relation("UserFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@index([followerId, createdAt])
+  @@map("follows")
+}
+
+model Activity {
+  id        String       @id @default(uuid())
+  actorId   String
+  actor     User         @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  type      ActivityType
+  projectId String
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionId String?
+  version   Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  dedupKey  String       @unique
+  createdAt DateTime     @default(now())
+
+  @@index([createdAt, id])
+  @@index([actorId, createdAt, id])
+  @@index([projectId])
+  @@index([versionId])
+  @@map("activities")
+}
+
+model Connection {
+  id          String           @id @default(uuid())
+  requesterId String
+  requester   User             @relation("ConnectionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User             @relation("ConnectionReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  pairKey     String           @unique
+  status      ConnectionStatus @default(Pending)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  acceptedAt  DateTime?
+  rejectedAt  DateTime?
+
+  notifications Notification[]
+
+  @@index([receiverId, status])
+  @@index([requesterId, status])
+  @@index([status])
+  @@map("connections")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+  @@map("likes")
+}
+
+model Tag {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  projectTags ProjectTag[]
+
+  @@map("tags")
+}
+
+model ProjectTag {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, tagId])
+  @@map("project_tags")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("categories")
+}
+
+model Notification {
+  id                  String           @id @default(uuid())
+  userId              String
+  user                User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  type                NotificationType
+  relatedProjectId    String?
+  relatedProject      Project?         @relation(fields: [relatedProjectId], references: [id], onDelete: Cascade)
+  relatedUserId       String?
+  relatedUser         User?            @relation("NotificationActor", fields: [relatedUserId], references: [id], onDelete: SetNull)
+  relatedConnectionId String?
+  relatedConnection   Connection?      @relation(fields: [relatedConnectionId], references: [id], onDelete: Cascade)
+  relatedVersionId    String?
+  relatedVersion      Version?         @relation(fields: [relatedVersionId], references: [id], onDelete: SetNull)
+  relatedCommentId    String?
+  relatedComment      Comment?         @relation(fields: [relatedCommentId], references: [id], onDelete: SetNull)
+  isRead              Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([relatedConnectionId])
+  @@index([relatedVersionId])
+  @@index([relatedCommentId])
+  @@map("notifications")
+}
+
+model Report {
+  id         String           @id @default(uuid())
+  reporterId String
+  reporter   User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  status     ReportStatus     @default(Open)
+  createdAt  DateTime         @default(now())
+
+  @@map("reports")
+}

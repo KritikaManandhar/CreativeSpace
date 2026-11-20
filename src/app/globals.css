@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0c0b0a;
+  --surface: #151311;
+  --elevated: #1e1b18;
+  --foreground: #f5f0e8;
+  --muted: #a89f94;
+  --accent: #e85d3f;
+  --ochre: #e5a93c;
+  --sage: #4e9f76;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  min-height: 100vh;
+}
+
+/* Subtle architectural studio grid */
+.studio-grid {
+  background-image:
+    linear-gradient(to right, rgba(245, 240, 232, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 240, 232, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Subtle analog paper / darkroom film grain */
+.studio-grain {
+  background-image: radial-gradient(rgba(245, 240, 232, 0.06) 0.75px, transparent 0.75px);
+  background-size: 16px 16px;
+}
+
+/* Warm hairline border utility */
+.atelier-border {
+  border-color: rgba(245, 240, 232, 0.09);
+}
+
+/* Editorial landing page fine paper grain */
+.editorial-grain {
+  background-image: radial-gradient(rgba(32, 59, 53, 0.045) 0.75px, transparent 0.75px);
+  background-size: 20px 20px;
+}
+
+/* Reduced motion safeguard for CSS animations */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Custom warm scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0c0b0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2b2723;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #443e38;
+}

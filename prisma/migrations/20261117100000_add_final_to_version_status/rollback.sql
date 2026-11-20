@@ -1,0 +1,3 @@
+-- Rollback: PostgreSQL does not support ALTER TYPE ... DROP VALUE directly.
+-- If 'Final' is unused by any row, leaving it in the enum type catalog is completely harmless
+-- and has no effect on database integrity or schema operations.

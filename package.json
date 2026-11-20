@@ -1,0 +1,51 @@
+{
+  "name": "creativespace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "ts-node prisma/seed.ts",
+    "test:security": "ts-node tests/phase1-rbac-security.test.ts",
+    "test:lifecycle": "ts-node tests/phase2-version-lifecycle.test.ts",
+    "test:connections": "ts-node tests/phase3-1-connections.test.ts",
+    "test:discussions": "ts-node tests/phase3-2-discussions.test.ts",
+    "test:collaboration": "ts-node tests/phase3-3-collaboration.test.ts",
+    "test:feed": "ts-node tests/phase3-4-feed.test.ts",
+    "test:storage-security": "ts-node tests/phase3-9-storage-security.test.ts",
+    "test:pg": "ts-node tests/phase3-5-pg-integration.test.ts",
+    "test:all": "ts-node tests/phase1-rbac-security.test.ts && ts-node tests/phase2-version-lifecycle.test.ts && ts-node tests/phase3-1-connections.test.ts && ts-node tests/phase3-2-discussions.test.ts && ts-node tests/phase3-3-collaboration.test.ts && ts-node tests/phase3-4-feed.test.ts && ts-node tests/phase3-9-storage-security.test.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.48.1",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.469.0",
+    "next": "14.2.24",
+    "next-auth": "^4.24.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prisma": "^6.4.1",
+    "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
