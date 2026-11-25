@@ -13,6 +13,7 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  Compass,
 } from "lucide-react";
 import { CelestialSpark } from "@/components/landing/CreativeSpaceBrand";
 import { PolicyModal } from "./PolicyModals";
@@ -81,6 +82,7 @@ export function SignupForm() {
   const router = useRouter();
 
   // Form states
+  const [selectedRole, setSelectedRole] = useState<"CREATOR" | "VIEWER">("CREATOR");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -116,6 +118,11 @@ export function SignupForm() {
     setErrorMessage(null);
 
     // Client-side validations
+    if (!selectedRole || (selectedRole !== "CREATOR" && selectedRole !== "VIEWER")) {
+      setErrorMessage("Please select whether you are registering as a Creator or a Viewer.");
+      return;
+    }
+
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
@@ -157,6 +164,7 @@ export function SignupForm() {
           username: chosenUsername,
           displayName: trimmedName,
           password,
+          role: selectedRole,
           disciplines: [],
         }),
       });
@@ -178,6 +186,7 @@ export function SignupForm() {
             username: fallbackUsername,
             displayName: trimmedName,
             password,
+            role: selectedRole,
             disciplines: [],
           }),
         });
@@ -233,24 +242,26 @@ export function SignupForm() {
             </div>
             <div className="space-y-1.5">
               <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#9DB5A5]">
-                Cosmic Portal Open
+                {selectedRole === "CREATOR" ? "Creator Studio Opening" : "Viewer Access Granted"}
               </p>
               <h3 className="font-serif text-2xl sm:text-3xl font-normal text-[#203B35]">
                 Welcome to CreativeSpace
               </h3>
               <p className="text-sm text-[#282B2A]/70 max-w-xs">
-                Preparing your studio, project drafts, and creative workspace...
+                {selectedRole === "CREATOR"
+                  ? "Preparing your studio, project drafts, and creative workspace..."
+                  : "Curating inspiring creators, community exhibits, and discovery feed..."}
               </p>
             </div>
             <div className="flex items-center gap-2 pt-2 text-xs text-[#92958F] font-mono">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[#203B35]" />
-              <span>Redirecting to studio</span>
+              <span>{selectedRole === "CREATOR" ? "Entering your studio" : "Entering community"}</span>
             </div>
           </div>
         ) : (
           <div>
             {/* Form Header */}
-            <div className="space-y-1.5 pb-6">
+            <div className="space-y-1.5 pb-5">
               <h2 className="font-serif text-[26px] sm:text-[30px] font-normal leading-tight text-[#203B35] tracking-tight">
                 Create your account
               </h2>
@@ -272,6 +283,128 @@ export function SignupForm() {
 
             {/* Main Form */}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {/* Role Selection Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#203B35]">
+                    Select Your Role
+                  </label>
+                  <span className="text-[11px] font-mono text-[#9DB5A5]">
+                    {selectedRole === "CREATOR" ? "Joining as Creator" : "Joining as Viewer"}
+                  </span>
+                </div>
+
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+                  role="radiogroup"
+                  aria-label="Account Role"
+                >
+                  {/* Option 1: I'm a Creator */}
+                  <div
+                    role="radio"
+                    aria-checked={selectedRole === "CREATOR"}
+                    tabIndex={0}
+                    onClick={() => setSelectedRole("CREATOR")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedRole("CREATOR");
+                      }
+                    }}
+                    className={`relative cursor-pointer rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 select-none flex flex-col justify-between ${
+                      selectedRole === "CREATOR"
+                        ? "border-[#203B35] bg-[#203B35]/[0.05] shadow-xs ring-1 ring-[#203B35]/25"
+                        : "border-[#203B35]/15 bg-white/40 hover:border-[#9DB5A5] hover:bg-white/70"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
+                              selectedRole === "CREATOR"
+                                ? "bg-[#203B35] text-[#F6F3EB]"
+                                : "bg-[#203B35]/10 text-[#203B35]"
+                            }`}
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-[13.5px] font-semibold text-[#203B35]">
+                            I&apos;m a Creator
+                          </span>
+                        </div>
+                        <div
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                            selectedRole === "CREATOR"
+                              ? "border-[#203B35] bg-[#203B35] text-white"
+                              : "border-[#203B35]/30 bg-transparent"
+                          }`}
+                        >
+                          {selectedRole === "CREATOR" && (
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[11.5px] leading-[1.45] text-[#282B2A]/75">
+                        Share your creativity, showcase your work, publish projects, offer services, and collaborate with other creators.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Option 2: I'm a Viewer */}
+                  <div
+                    role="radio"
+                    aria-checked={selectedRole === "VIEWER"}
+                    tabIndex={0}
+                    onClick={() => setSelectedRole("VIEWER")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedRole("VIEWER");
+                      }
+                    }}
+                    className={`relative cursor-pointer rounded-2xl p-3 sm:p-3.5 border transition-all duration-200 select-none flex flex-col justify-between ${
+                      selectedRole === "VIEWER"
+                        ? "border-[#203B35] bg-[#203B35]/[0.05] shadow-xs ring-1 ring-[#203B35]/25"
+                        : "border-[#203B35]/15 bg-white/40 hover:border-[#9DB5A5] hover:bg-white/70"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
+                              selectedRole === "VIEWER"
+                                ? "bg-[#203B35] text-[#F6F3EB]"
+                                : "bg-[#203B35]/10 text-[#203B35]"
+                            }`}
+                          >
+                            <Compass className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-[13.5px] font-semibold text-[#203B35]">
+                            I&apos;m a Viewer
+                          </span>
+                        </div>
+                        <div
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                            selectedRole === "VIEWER"
+                              ? "border-[#203B35] bg-[#203B35] text-white"
+                              : "border-[#203B35]/30 bg-transparent"
+                          }`}
+                        >
+                          {selectedRole === "VIEWER" && (
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[11.5px] leading-[1.45] text-[#282B2A]/75">
+                        Discover creative work, explore creators, follow inspiring accounts, like, comment, save content, and discover or book services.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 1. Full Name */}
               <div className="space-y-1.5">
                 <label

@@ -75,5 +75,5 @@ export function validateCategoryMetadata(category: string, metadata: unknown) {
     // If category has no special schema, allow arbitrary key-value json or empty object
     return z.record(z.any()).safeParse(metadata || {});
   }
-  return schema.safeParse(metadata);
+  return schema.partial().passthrough().safeParse(metadata || {});
 }

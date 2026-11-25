@@ -48,6 +48,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           username: user.username,
           displayName: user.displayName,
+          role: user.role,
           isAdmin: user.isAdmin,
           avatarUrl: user.avatarUrl,
           disciplines,
@@ -61,16 +62,20 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.username = user.username;
         token.displayName = user.displayName;
+        token.role = user.role;
         token.isAdmin = user.isAdmin;
         token.avatarUrl = user.avatarUrl;
         token.disciplines = user.disciplines;
       }
 
-      // Handle session updates (e.g. profile edit)
+      // Handle session updates (e.g. profile edit or role update)
       if (trigger === "update" && session?.user) {
         token.displayName = session.user.displayName || token.displayName;
         token.avatarUrl = session.user.avatarUrl || token.avatarUrl;
         token.disciplines = session.user.disciplines || token.disciplines;
+        if (session.user.role) {
+          token.role = session.user.role;
+        }
       }
 
       return token;
@@ -80,6 +85,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.username = token.username as string;
         session.user.displayName = token.displayName as string;
+        session.user.role = token.role;
         session.user.isAdmin = !!token.isAdmin;
         session.user.avatarUrl = (token.avatarUrl as string) || null;
         session.user.disciplines = (token.disciplines as string[]) || [];

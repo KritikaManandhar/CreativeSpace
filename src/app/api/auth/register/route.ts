@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Hash password with bcrypt
     const passwordHash = await bcrypt.hash(validatedData.password, 12);
 
-    // Create user and initial portfolio inside a transaction
+    // Create user and conditional portfolio inside a transaction
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
           username,
           passwordHash,
           displayName: validatedData.displayName.trim(),
+          role: validatedData.role,
           bio: validatedData.bio?.trim() || null,
           disciplines: validatedData.disciplines || [],
         },
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
           email: true,
           username: true,
           displayName: true,
+          role: true,
           bio: true,
           disciplines: true,
           avatarUrl: true,
@@ -55,13 +57,15 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Initialize empty portfolio for the creator
-      await tx.portfolio.create({
-        data: {
-          userId: user.id,
-          customSlug: user.username,
-        },
-      });
+      // Initialize empty portfolio only for Creators; Viewers do not have a portfolio
+      if (validatedData.role === "CREATOR") {
+        await tx.portfolio.create({
+          data: {
+            userId: user.id,
+            customSlug: user.username,
+          },
+        });
+      }
 
       return user;
     });

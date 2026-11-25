@@ -55,6 +55,22 @@ enum NotificationType {
   Reply
   Like
   Follow
+  // Booking Notifications
+  BookingRequested
+  BookingConfirmed
+  BookingRejected
+  BookingAlternativeProposed
+  BookingAlternativeUpdated
+  BookingAlternativeAccepted
+  BookingAlternativeDeclined
+  BookingAlternativeExpired
+  BookingCancelledByClient
+  BookingCancelledByCreator
+  BookingCancelledMutual
+  BookingExpired
+  MutualCancellationRequested
+  MutualCancellationDeclined
+  MutualCancellationExpired
 }
 
 enum ActivityType {
@@ -95,6 +111,71 @@ enum UploadIntentStatus {
   CleanedUp
 }
 
+enum UserRole {
+  CREATOR
+  VIEWER
+}
+
+// === NEW BOOKING ENUMS (7) ===
+enum BookingStatus {
+  PendingReview
+  AlternativeProposed
+  Confirmed
+  DeclinedByCreator
+  DeclinedAlternativeByClient
+  Expired_RequestUnanswered
+  Expired_AlternativeUnanswered
+  CancelledByClient
+  CancelledByCreator
+  Cancelled_MutualAgreement
+  Completed
+}
+
+enum BookingProposalStatus {
+  None
+  Proposed
+  Accepted
+  Declined
+  Expired
+  Superseded
+}
+
+enum SlotReservationType {
+  PrimaryRequest
+  ConfirmedSlot
+  TentativeAlternative
+}
+
+enum SlotReservationStatus {
+  Active
+  Released
+}
+
+enum OutboxStatus {
+  Pending
+  Processing
+  Processed
+  Failed
+}
+
+enum BookingActor {
+  Client
+  Creator
+  System
+  Admin
+  Mutual
+}
+
+enum DayOfWeek {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+  Sunday
+}
+
 model User {
   id            String        @id @default(uuid())
   email         String        @unique
@@ -106,6 +187,8 @@ model User {
   disciplines   Json          @default("[]")
   socialLinks   Json?
   socialPrivacy SocialPrivacy @default(Public)
+  role          UserRole      @default(CREATOR)
+  timezone      String        @default("UTC")
   isAdmin       Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -128,6 +211,15 @@ model User {
   actedNotifications  Notification[]        @relation("NotificationActor")
   activities          Activity[]
   reports             Report[]
+
+  // Booking Module Relations
+  creatorServices        CreatorService[]
+  availabilityTemplates  CreatorAvailabilityTemplate[]
+  dateOverrides          CreatorDateOverride[]
+  bookingsAsCreator      Booking[]                     @relation("CreatorBookings")
+  bookingsAsClient       Booking[]                     @relation("ClientBookings")
+  slotReservations       BookingSlotReservation[]
+  authoredBookingHistory BookingHistory[]
 
   @@map("users")
 }
@@ -244,19 +336,19 @@ model Version {
 }
 
 model Comment {
-  id        String        @id @default(uuid())
+  id        String    @id @default(uuid())
   projectId String
-  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   versionId String?
-  version   Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  version   Version?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
   authorId  String
-  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   parentId  String?
-  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Restrict)
-  replies   Comment[]     @relation("CommentReplies")
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies   Comment[] @relation("CommentReplies")
   content   String
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @default(now()) @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   likes         CommentLike[]
   notifications Notification[]
@@ -416,13 +508,20 @@ model Notification {
   relatedVersion      Version?         @relation(fields: [relatedVersionId], references: [id], onDelete: SetNull)
   relatedCommentId    String?
   relatedComment      Comment?         @relation(fields: [relatedCommentId], references: [id], onDelete: SetNull)
+  relatedBookingId    String?
+  relatedBooking      Booking?         @relation(fields: [relatedBookingId], references: [id], onDelete: Cascade)
+  outboxEventId       String?
+  outboxEvent         BookingOutbox?   @relation(fields: [outboxEventId], references: [id], onDelete: SetNull)
   isRead              Boolean          @default(false)
   createdAt           DateTime         @default(now())
 
+  @@unique([outboxEventId, userId])
   @@index([userId, isRead])
   @@index([relatedConnectionId])
   @@index([relatedVersionId])
   @@index([relatedCommentId])
+  @@index([relatedBookingId])
+  @@index([outboxEventId])
   @@map("notifications")
 }
 
@@ -437,4 +536,202 @@ model Report {
   createdAt  DateTime         @default(now())
 
   @@map("reports")
+}
+
+// ==========================================
+// === NEW BOOKING MODULE MODELS (8) ========
+// ==========================================
+
+model CreatorService {
+  id                String   @id @default(uuid())
+  creatorId         String
+  creator           User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  title             String
+  description       String
+  durationMinutes   Int
+  priceInMinorUnits BigInt
+  currency          String   @default("USD")
+  bufferMinutes     Int      @default(0)
+  minNoticeHours    Int      @default(24)
+  maxAdvanceDays    Int      @default(60)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  bookings              Booking[]
+  availabilityTemplates CreatorAvailabilityTemplate[]
+  dateOverrides         CreatorDateOverride[]
+
+  @@unique([id, creatorId])
+  @@index([creatorId, isActive])
+  @@map("creator_services")
+}
+
+model CreatorAvailabilityTemplate {
+  id          String          @id @default(uuid())
+  creatorId   String
+  creator     User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     CreatorService? @relation(fields: [serviceId, creatorId], references: [id, creatorId], onDelete: Cascade)
+  dayOfWeek   DayOfWeek
+  startMinute Int
+  endMinute   Int
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([creatorId, dayOfWeek])
+  @@index([serviceId, creatorId, dayOfWeek])
+  @@map("creator_availability_templates")
+}
+
+model CreatorDateOverride {
+  id        String          @id @default(uuid())
+  creatorId String
+  creator   User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   CreatorService? @relation(fields: [serviceId, creatorId], references: [id, creatorId], onDelete: Cascade)
+  date      DateTime        @db.Date
+  isBlocked Boolean         @default(false)
+  createdAt DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime        @updatedAt @db.Timestamptz(3)
+
+  windows CreatorDateOverrideWindow[]
+
+  @@index([creatorId, date])
+  @@index([serviceId, creatorId, date])
+  @@map("creator_date_overrides")
+}
+
+model CreatorDateOverrideWindow {
+  id          String              @id @default(uuid())
+  overrideId  String
+  override    CreatorDateOverride @relation(fields: [overrideId], references: [id], onDelete: Cascade)
+  startMinute Int
+  endMinute   Int
+
+  @@index([overrideId])
+  @@map("creator_date_override_windows")
+}
+
+model Booking {
+  id        String         @id @default(uuid())
+  serviceId String
+  creatorId String
+  service   CreatorService @relation(fields: [serviceId, creatorId], references: [id, creatorId], onDelete: Restrict)
+  creator   User           @relation("CreatorBookings", fields: [creatorId], references: [id], onDelete: Restrict)
+  clientId  String
+  client    User           @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Restrict)
+
+  agreedPriceInMinorUnits BigInt
+  currency                String @default("USD")
+  durationMinutes         Int
+  bufferMinutes           Int    @default(0)
+
+  status         BookingStatus         @default(PendingReview)
+  proposalStatus BookingProposalStatus @default(None)
+
+  // Canonical Appointment Timestamps
+  requestedStartsAt DateTime  @db.Timestamptz(3)
+  requestedEndsAt   DateTime  @db.Timestamptz(3)
+  confirmedStartsAt DateTime? @db.Timestamptz(3)
+  confirmedEndsAt   DateTime? @db.Timestamptz(3)
+  clientTimezone    String
+  creatorTimezone   String
+
+  alternativeStartsAt          DateTime? @db.Timestamptz(3)
+  alternativeEndsAt            DateTime? @db.Timestamptz(3)
+  alternativeProposalExpiresAt DateTime? @db.Timestamptz(3)
+  proposalCounter              Int       @default(0)
+
+  requestExpiresAt   DateTime      @db.Timestamptz(3)
+  cancellationReason String?
+  cancelledByActor   BookingActor?
+  cancelledAt        DateTime?     @db.Timestamptz(3)
+
+  // Mutual Cancellation Workflow
+  mutualCancellationRequestedBy String?
+  mutualCancellationRequestedAt DateTime? @db.Timestamptz(3)
+  mutualCancellationExpiresAt   DateTime? @db.Timestamptz(3)
+
+  clientNotes String?
+  version     Int     @default(1)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  slotReservations BookingSlotReservation[]
+  history          BookingHistory[]
+  notifications    Notification[]
+  outboxEvents     BookingOutbox[]
+
+  @@unique([id, creatorId])
+  @@index([creatorId, status, requestedStartsAt])
+  @@index([clientId, status, requestedStartsAt])
+  @@index([creatorId, status, confirmedStartsAt])
+  @@index([serviceId, creatorId, status])
+  @@index([requestExpiresAt])
+  @@index([alternativeProposalExpiresAt])
+  @@map("bookings")
+}
+
+model BookingSlotReservation {
+  id            String                @id @default(uuid())
+  bookingId     String
+  creatorId     String
+  booking       Booking               @relation(fields: [bookingId, creatorId], references: [id, creatorId], onDelete: Restrict)
+  creator       User                  @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  slotType      SlotReservationType
+  status        SlotReservationStatus @default(Active)
+  startsAt      DateTime              @db.Timestamptz(3)
+  endsAt        DateTime              @db.Timestamptz(3)
+  bufferMinutes Int                   @default(0)
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([creatorId, status, startsAt, endsAt])
+  @@index([bookingId, status])
+  @@map("booking_slot_reservations")
+}
+
+model BookingHistory {
+  id         String         @id @default(uuid())
+  bookingId  String
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  actorId    String?
+  actor      User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  BookingActor
+  action     String
+  fromStatus BookingStatus?
+  toStatus   BookingStatus
+  payload    Json           @default("{}")
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([bookingId, createdAt])
+  @@map("booking_history")
+}
+
+model BookingOutbox {
+  id              String       @id @default(uuid())
+  bookingId       String
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  eventType       String
+  payload         Json
+  idempotencyKey  String       @unique
+  status          OutboxStatus @default(Pending)
+  retryCount      Int          @default(0)
+  maxRetries      Int          @default(5)
+  availableAt     DateTime     @default(now()) @db.Timestamptz(3)
+  processedAt     DateTime?    @db.Timestamptz(3)
+  lastError       String?
+  lockedAt        DateTime?    @db.Timestamptz(3)
+  lockedBy        String?
+  leaseToken      String?
+  leaseGeneration Int          @default(0)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+
+  notifications Notification[]
+
+  @@index([status, availableAt])
+  @@index([bookingId])
+  @@map("booking_outbox")
 }

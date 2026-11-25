@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   Users,
   Settings,
+  MessageSquare,
   Menu,
   X,
 } from "lucide-react";
@@ -62,13 +63,24 @@ export function Navbar() {
   const isAuthenticated = status === "authenticated";
   const user = session?.user;
 
-  // On editorial pages ("/", "/register", "/login"), the dedicated editorial navigation is rendered instead
-  if ((pathname === "/" || pathname === "/register" || pathname === "/login") && !isAuthenticated) {
+  // On home, feed, explore, discover, register, login, profile, and projects pages, dedicated navigation is rendered instead
+  if (
+    pathname === "/" ||
+    pathname === "/feed" ||
+    pathname === "/explore" ||
+    pathname === "/discover" ||
+    pathname === "/register" ||
+    pathname === "/login" ||
+    pathname?.startsWith("/profile") ||
+    pathname?.startsWith("/projects")
+  ) {
     return null;
   }
 
   const navLinkClass = (href: string) => {
-    const active = pathname === href;
+    const active =
+      pathname === href ||
+      (href === "/explore" && (pathname === "/explore" || pathname === "/discover"));
     return `flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
       active
         ? "text-[#F5F0E8] bg-white/[0.07]"
@@ -97,9 +109,9 @@ export function Navbar() {
 
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-1 pl-2" aria-label="Primary navigation">
-            <Link href="/discover" className={navLinkClass("/discover")}>
+            <Link href="/explore" className={navLinkClass("/explore")}>
               <Compass className="w-4 h-4 text-[#E85D3F]" />
-              Discover
+              Explore
             </Link>
             <Link href="/feed" className={navLinkClass("/feed")}>
               <Sparkles className="w-4 h-4 text-[#E5A93C]" />
@@ -117,6 +129,10 @@ export function Navbar() {
                 >
                   <Users className="w-4 h-4 text-[#4E9F76]" />
                   Connections
+                </Link>
+                <Link href="/messages" className={navLinkClass("/messages")}>
+                  <MessageSquare className="w-4 h-4 text-[#E85D3F]" />
+                  Messages
                 </Link>
               </>
             )}
@@ -138,7 +154,7 @@ export function Navbar() {
             <div className="flex items-center gap-3">
               {/* Notifications */}
               <Link
-                href="/dashboard?tab=notifications"
+                href="/notifications"
                 className="relative rounded-lg p-2 text-[#A89F94] hover:bg-white/[0.06] hover:text-[#F5F0E8] transition-colors"
                 title="Notifications"
                 aria-label="Notifications"
@@ -186,7 +202,7 @@ export function Navbar() {
                       className="flex items-center gap-2.5 px-4 py-2 text-xs text-[#A89F94] hover:bg-white/[0.05] hover:text-[#F5F0E8] transition-colors"
                     >
                       <UserIcon className="w-4 h-4 text-[#E85D3F]" />
-                      View Portfolio & Profile
+                      {user?.role === "VIEWER" ? "View Profile" : "View Portfolio & Profile"}
                     </Link>
 
                     <Link
@@ -195,7 +211,7 @@ export function Navbar() {
                       className="flex items-center gap-2.5 px-4 py-2 text-xs text-[#A89F94] hover:bg-white/[0.05] hover:text-[#F5F0E8] transition-colors"
                     >
                       <FolderKanban className="w-4 h-4 text-[#E5A93C]" />
-                      Creator Workspace
+                      {user?.role === "VIEWER" ? "Viewer Space" : "Creator Workspace"}
                     </Link>
 
                     <Link
@@ -205,6 +221,15 @@ export function Navbar() {
                     >
                       <Users className="w-4 h-4 text-[#4E9F76]" />
                       Connections
+                    </Link>
+
+                    <Link
+                      href="/messages"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2 text-xs text-[#A89F94] hover:bg-white/[0.05] hover:text-[#F5F0E8] transition-colors"
+                    >
+                      <MessageSquare className="w-4 h-4 text-[#E85D3F]" />
+                      Messages / Inbox
                     </Link>
 
                     <Link
@@ -265,12 +290,12 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-white/[0.08] bg-[#0C0B0A] px-4 pt-3 pb-5 space-y-1.5">
           <Link
-            href="/discover"
+            href="/explore"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#F5F0E8] hover:bg-white/[0.05] rounded-lg"
           >
             <Compass className="w-4 h-4 text-[#E85D3F]" />
-            Discover Works
+            Explore Universe
           </Link>
           <Link
             href="/feed"
@@ -297,6 +322,14 @@ export function Navbar() {
               >
                 <Users className="w-4 h-4 text-[#4E9F76]" />
                 Connections
+              </Link>
+              <Link
+                href="/messages"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#F5F0E8] hover:bg-white/[0.05] rounded-lg"
+              >
+                <MessageSquare className="w-4 h-4 text-[#E85D3F]" />
+                Messages / Inbox
               </Link>
             </>
           )}

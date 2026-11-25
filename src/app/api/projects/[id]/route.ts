@@ -189,6 +189,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       versions: visibleVersions,
       comments: visibleProjectComments,
       userRole: role,
+      canEdit: role === "Owner" || Boolean(user?.isAdmin),
       hasLiked,
       isPortfolioFeatured: project.portfolioProjects.length > 0,
       tags: project.projectTags.map((pt) => pt.tag.name),
@@ -228,6 +229,20 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Preserve existing metadata when updating metadata
+      let nextMetadata: any = undefined;
+      if (validatedData.metadata !== undefined) {
+        const current = await tx.project.findUnique({
+          where: { id: projectId },
+          select: { metadata: true },
+        });
+        const currentMeta = (current?.metadata as Record<string, any>) || {};
+        nextMetadata = {
+          ...currentMeta,
+          ...validatedData.metadata,
+        };
+      }
+
       const p = await tx.project.update({
         where: { id: projectId },
         data: {
@@ -236,7 +251,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           category: validatedData.category?.trim(),
           status: validatedData.status,
           visibility: validatedData.visibility,
-          metadata: validatedData.metadata !== undefined ? validatedData.metadata : undefined,
+          metadata: nextMetadata !== undefined ? nextMetadata : undefined,
         },
       });
 

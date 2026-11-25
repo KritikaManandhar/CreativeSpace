@@ -19,8 +19,17 @@ export function Footer() {
   const pathname = usePathname();
   const { status } = useSession();
 
-  // On editorial pages ("/", "/register", "/login"), the dedicated editorial footer is rendered instead
-  if ((pathname === "/" || pathname === "/register" || pathname === "/login") && status !== "authenticated") {
+  // On home, feed, explore, discover, register, login, profile, and projects pages, dedicated footers or app layouts are rendered instead
+  if (
+    pathname === "/" ||
+    pathname === "/feed" ||
+    pathname === "/explore" ||
+    pathname === "/discover" ||
+    pathname === "/register" ||
+    pathname === "/login" ||
+    pathname?.startsWith("/profile") ||
+    pathname?.startsWith("/projects")
+  ) {
     return null;
   }
 
@@ -70,8 +79,8 @@ export function Footer() {
             </h4>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link href="/discover" className="hover:text-[#F5F0E8] transition-colors">
-                  Explore Exhibition
+                <Link href="/explore" className="hover:text-[#F5F0E8] transition-colors">
+                  Explore Universe
                 </Link>
               </li>
               <li>

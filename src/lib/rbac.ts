@@ -125,13 +125,22 @@ export async function authorize(
   // Role permissions per PRD Section 18 & TRD Section 13
   switch (action) {
     case "manage_settings":
+      if (role !== "Owner" && !user?.isAdmin) {
+        throw new AppError(
+          "FORBIDDEN",
+          `Only the project owner or authorized administrator can perform this action: ${action}`,
+          403
+        );
+      }
+      break;
+
     case "delete_project":
     case "invite_collaborator":
     case "manage_collaborator":
     case "publish_portfolio":
     case "designate_final_version":
     case "delete_version":
-      if (role !== "Owner") {
+      if (role !== "Owner" && !user?.isAdmin) {
         throw new AppError(
           "FORBIDDEN",
           `Only the project owner can perform this action: ${action}`,

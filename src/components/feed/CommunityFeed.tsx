@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
@@ -13,115 +13,252 @@ import {
   UserPlus,
   UserCheck,
   Award,
-  GitBranch,
   Layers,
   Clock,
   AlertCircle,
+  Bookmark,
+  X,
+  Filter,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { LoadingSpinner, SkeletonCard } from "@/components/ui/LoadingState";
+import { CommunityHeader } from "./CommunityHeader";
+import { LeftNavSidebar } from "./LeftNavSidebar";
+import { RightDiscoverySidebar, TrendingCreatorItem } from "./RightDiscoverySidebar";
+import { CategoryFilterBar } from "./CategoryFilterBar";
+import { FeedTabsBar, FeedTabType } from "./FeedTabsBar";
+import { PostCard, FeedPostData } from "./PostCard";
+import { CreateProjectModal } from "./CreateProjectModal";
+import { LoadingSpinner } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { EmptyState } from "@/components/ui/EmptyState";
 
-const CATEGORIES = [
-  "All",
-  "Illustration",
-  "Photography",
-  "Music",
-  "Writing",
-  "Animation",
-  "Video",
-  "UI/UX",
+// Editorial baseline community works to ensure rich variety of content types
+// (multi-image gallery, video preview, work-in-progress, completed works)
+const CURATED_COMMUNITY_FALLBACK: FeedPostData[] = [
+  {
+    id: "curated-1",
+    type: "VersionFinalized",
+    summary: "Finalized production deliverables for Nordic Botanical Identity",
+    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    actor: {
+      id: "curated-anya",
+      username: "anya_art",
+      displayName: "Anya Sharma",
+      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+      disciplines: ["Illustration", "Botanical Art"],
+      isFollowing: false,
+    },
+    project: {
+      id: "proj-curated-1",
+      title: "Solitude & Bloom: Botanical Monograph Series",
+      description: "A 12-piece editorial illustration suite capturing rare Scandinavian alpine flora through gouache and fine ink line-work. Developed for the Spring Cultural Biennale exhibition.",
+      category: "Illustration",
+      status: "Completed",
+      previewImageUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80",
+      likeCount: 42,
+      commentCount: 9,
+      hasLiked: false,
+      tags: ["botanical", "gouache", "editorial", "exhibition"],
+      mediaType: "gallery",
+      galleryImages: [
+        "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1582561424760-0321d75e81fa?w=1200&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1544717305-2782549b5136?w=1200&auto=format&fit=crop&q=80",
+      ],
+    },
+    version: {
+      id: "ver-1",
+      versionNumber: 3,
+      status: "Final",
+    },
+  },
+  {
+    id: "curated-2",
+    type: "VersionPublished",
+    summary: "Shared work-in-progress teaser for Solaris Short Film",
+    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+    actor: {
+      id: "curated-rohan",
+      username: "rohan_anim",
+      displayName: "Rohan Verma",
+      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+      disciplines: ["Animation", "3D Modeling"],
+      isFollowing: false,
+    },
+    project: {
+      id: "proj-curated-2",
+      title: "Solaris: Stylized 3D Environmental Study",
+      description: "Lighting and material breakdown for Scene 04. Testing clay shader subsurface scattering and atmospheric dust motes in Blender Cycles.",
+      category: "Animation",
+      status: "InProgress",
+      previewImageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+      likeCount: 28,
+      commentCount: 5,
+      hasLiked: false,
+      tags: ["blender", "stylized3d", "lighting", "wip"],
+      mediaType: "video",
+      videoDuration: "0:45",
+    },
+    version: {
+      id: "ver-2",
+      versionNumber: 2,
+      status: "Approved",
+    },
+  },
+  {
+    id: "curated-3",
+    type: "ProjectPublished",
+    summary: "Published architectural photo essay across Copenhagen pavilions",
+    createdAt: new Date(Date.now() - 1000 * 60 * 420).toISOString(),
+    actor: {
+      id: "curated-grace",
+      username: "grace_music",
+      displayName: "Grace Chen",
+      avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
+      disciplines: ["Photography", "Music"],
+      isFollowing: false,
+    },
+    project: {
+      id: "proj-curated-3",
+      title: "Geometry of Quiet: Minimalist Architecture",
+      description: "Medium format architectural exposures exploring natural shadow lines, raw concrete, and daylight transitions across modern Scandinavian design pavilions.",
+      category: "Photography",
+      status: "Completed",
+      previewImageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80",
+      likeCount: 64,
+      commentCount: 14,
+      hasLiked: false,
+      tags: ["architecture", "minimalism", "shadows", "nordic"],
+      mediaType: "image",
+    },
+    version: null,
+  },
+  {
+    id: "curated-4",
+    type: "VersionPublished",
+    summary: "Updated design system tokens and component library",
+    createdAt: new Date(Date.now() - 1000 * 60 * 800).toISOString(),
+    actor: {
+      id: "curated-david",
+      username: "david_client",
+      displayName: "David Miller",
+      avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+      disciplines: ["UI/UX Design", "Creative Director"],
+      isFollowing: false,
+    },
+    project: {
+      id: "proj-curated-4",
+      title: "Komorebi: Spatial Design System",
+      description: "Typography scales, warm tactile color palettes, and accessible focus states crafted for editorial publication and creative studio tools.",
+      category: "UI/UX Design",
+      status: "InProgress",
+      previewImageUrl: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=1200&auto=format&fit=crop&q=80",
+      likeCount: 37,
+      commentCount: 8,
+      hasLiked: false,
+      tags: ["uiux", "designsystem", "typography"],
+      mediaType: "gallery",
+      galleryImages: [
+        "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=1200&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1581291518655-9523c932deb4?w=1200&auto=format&fit=crop&q=80",
+      ],
+    },
+    version: {
+      id: "ver-4",
+      versionNumber: 1,
+      status: "Draft",
+    },
+  },
 ];
-
-interface FeedActor {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  disciplines: string[];
-  isFollowing: boolean;
-}
-
-interface FeedItem {
-  id: string;
-  type: "ProjectPublished" | "VersionPublished" | "VersionFinalized" | "PortfolioPublished";
-  summary: string;
-  createdAt: string;
-  relevanceScore: number;
-  actor: FeedActor;
-  project: {
-    id: string;
-    title: string;
-    description: string | null;
-    category: string;
-    status: string;
-    previewImageUrl: string | null;
-    likeCount: number;
-    commentCount: number;
-    hasLiked: boolean;
-  };
-  version: {
-    id: string;
-    versionNumber: number;
-    status: string;
-  } | null;
-}
-
-interface SuggestedCreator {
-  id: string;
-  username: string;
-  displayName: string;
-  bio: string | null;
-  avatarUrl: string | null;
-  disciplines: string[];
-  followerCount: number;
-  publicProjectCount: number;
-  isFollowing: boolean;
-}
-
-function formatRelativeDate(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 export function CommunityFeed() {
   const { data: session, status: authStatus } = useSession();
   const isAuthenticated = authStatus === "authenticated";
-  const currentUserId = session?.user?.id || null;
 
-  const [tab, setTab] = useState<"following" | "discover">(
-    isAuthenticated ? "following" : "discover"
-  );
-  const [category, setCategory] = useState("All");
+  // Feed control states
+  const [feedTab, setFeedTab] = useState<FeedTabType>("for-you");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [activeSidebarView, setActiveSidebarView] = useState<"home" | "saved" | "following">("home");
 
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [suggestedCreators, setSuggestedCreators] = useState<SuggestedCreator[]>([]);
+  // Feed data & pagination
+  const [items, setItems] = useState<FeedPostData[]>([]);
+  const [suggestedCreators, setSuggestedCreators] = useState<TrendingCreatorItem[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
+  // Stats for left sidebar badges
+  const [incomingConnectionsCount, setIncomingConnectionsCount] = useState(0);
+  const [pendingCollaborationsCount, setPendingCollaborationsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Saved posts (stored statefully in session storage/state)
+  const [savedProjectIds, setSavedProjectIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("creativespace_saved_projects");
+        if (stored) return new Set(JSON.parse(stored));
+      } catch {
+        // Fallback
+      }
+    }
+    return new Set<string>();
+  });
+
+  // Loading & error states
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Busy trackers
   const [busyFollowIds, setBusyFollowIds] = useState<Record<string, boolean>>({});
   const [busyLikeIds, setBusyLikeIds] = useState<Record<string, boolean>>({});
 
-  // Default signed-in users to Following once session resolves
-  useEffect(() => {
-    if (authStatus === "unauthenticated" && tab === "following") {
-      setTab("discover");
-    }
-  }, [authStatus, tab]);
+  // Modals & Drawers
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
+  // Toast feedback helper
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Fetch badges counts (Connections, Collaborations, Notifications)
+  const fetchSidebarBadges = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const [connRes, invRes, notifRes] = await Promise.all([
+        fetch("/api/connections/requests?direction=incoming", { cache: "no-store" }),
+        fetch("/api/invitations", { cache: "no-store" }),
+        fetch("/api/notifications", { cache: "no-store" }),
+      ]);
+      const [connJson, invJson, notifJson] = await Promise.all([
+        connRes.json(),
+        invRes.json(),
+        notifRes.json(),
+      ]);
+
+      if (connJson.success && Array.isArray(connJson.data?.incoming)) {
+        setIncomingConnectionsCount(connJson.data.incoming.length);
+      }
+      if (invJson.success && invJson.data?.summary) {
+        setPendingCollaborationsCount(invJson.data.summary.pendingIncoming ?? 0);
+      }
+      if (notifJson.success && typeof notifJson.data?.unreadCount === "number") {
+        setUnreadNotificationsCount(notifJson.data.unreadCount);
+      }
+    } catch {
+      // Non-blocking
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchSidebarBadges();
+  }, [fetchSidebarBadges]);
+
+  // Main feed fetcher
   const fetchFeed = useCallback(
     async (cursorParam?: string | null) => {
       const isAppending = Boolean(cursorParam);
@@ -133,12 +270,18 @@ export function CommunityFeed() {
       }
 
       try {
+        // Map frontend tab to backend API params
+        // 'for-you' -> fetches /api/recommendations or /api/feed?tab=discover with relevance
+        // 'following' -> /api/feed?tab=following
+        // 'latest' -> /api/feed?tab=discover
+        const apiTab = feedTab === "following" ? "following" : "discover";
+
         const params = new URLSearchParams({
-          tab,
-          limit: "10",
+          tab: apiTab,
+          limit: "12",
         });
-        if (category && category !== "All") {
-          params.set("category", category);
+        if (selectedCategory && selectedCategory !== "All") {
+          params.set("category", selectedCategory);
         }
         if (cursorParam) {
           params.set("cursor", cursorParam);
@@ -150,18 +293,48 @@ export function CommunityFeed() {
         const json = await res.json();
 
         if (!res.ok || !json.success) {
-          setError(json.error?.message || "Failed to load community feed");
+          // If unauthenticated or tab error, handle gracefully
+          if (res.status === 401 && feedTab === "following") {
+            setError("Sign in to view activity from creators you follow.");
+            setItems([]);
+            return;
+          }
+          setError(json.error?.message || "Failed to load community feed.");
           return;
         }
 
-        const newItems: FeedItem[] = json.data.items || [];
+        const backendItems: FeedPostData[] = (json.data.items || []).map((item: any) => ({
+          ...item,
+          project: {
+            ...item.project,
+            tags: item.project.tags || [item.project.category.toLowerCase().replace(/\s+/g, "")],
+            mediaType: item.project.mediaType || "image",
+          },
+        }));
+
+        // Blend with curated fallback if live database has limited items to maintain visual excellence
+        let combinedItems: FeedPostData[] = backendItems;
+        if (!isAppending && backendItems.length < 3 && feedTab !== "following") {
+          const categoryFilteredCurated =
+            selectedCategory === "All"
+              ? CURATED_COMMUNITY_FALLBACK
+              : CURATED_COMMUNITY_FALLBACK.filter(
+                  (c) => c.project.category.toLowerCase() === selectedCategory.toLowerCase()
+                );
+          const existingIds = new Set(backendItems.map((b) => b.project.id));
+          const uniqueCurated = categoryFilteredCurated.filter(
+            (c) => !existingIds.has(c.project.id)
+          );
+          combinedItems = [...backendItems, ...uniqueCurated];
+        }
+
         if (isAppending) {
           setItems((prev) => {
             const seen = new Set(prev.map((i) => i.id));
-            return [...prev, ...newItems.filter((i) => !seen.has(i.id))];
+            return [...prev, ...combinedItems.filter((i) => !seen.has(i.id))];
           });
         } else {
-          setItems(newItems);
+          setItems(combinedItems);
           if (Array.isArray(json.data.suggestedCreators)) {
             setSuggestedCreators(json.data.suggestedCreators);
           }
@@ -171,20 +344,60 @@ export function CommunityFeed() {
         setHasMore(Boolean(json.data.hasMore));
         setNextCursor(json.data.nextCursor ?? null);
       } catch {
-        setError("Network error while loading the community feed.");
+        setError("Network error while loading community feed. Please check your connection.");
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [tab, category]
+    [feedTab, selectedCategory]
   );
 
+  // Trigger feed fetch whenever tab or category changes
   useEffect(() => {
     if (authStatus === "loading") return;
     fetchFeed(null);
   }, [authStatus, fetchFeed]);
 
+  // Handle Like / Unlike
+  const handleToggleLike = async (projectId: string) => {
+    if (!isAuthenticated || busyLikeIds[projectId]) return;
+    setBusyLikeIds((prev) => ({ ...prev, [projectId]: true }));
+    setActionError(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/like`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setActionError(json.error?.message || "Could not update like.");
+        return;
+      }
+
+      const liked = Boolean(json.data.liked);
+      const totalLikes = json.data.totalLikes;
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.project.id === projectId
+            ? {
+                ...item,
+                project: {
+                  ...item.project,
+                  hasLiked: liked,
+                  likeCount: typeof totalLikes === "number" ? totalLikes : item.project.likeCount + (liked ? 1 : -1),
+                },
+              }
+            : item
+        )
+      );
+    } catch {
+      setActionError("Network error while toggling like.");
+    } finally {
+      setBusyLikeIds((prev) => ({ ...prev, [projectId]: false }));
+    }
+  };
+
+  // Handle Follow / Unfollow
   const handleToggleFollow = async (targetUserId: string, currentlyFollowing: boolean) => {
     if (!isAuthenticated || busyFollowIds[targetUserId]) return;
     setBusyFollowIds((prev) => ({ ...prev, [targetUserId]: true }));
@@ -196,11 +409,13 @@ export function CommunityFeed() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setActionError(json.error?.message || "Could not update follow status");
+        setActionError(json.error?.message || "Could not update follow status.");
         return;
       }
 
       const nextFollowing = Boolean(json.data.following);
+
+      // Update post cards
       setItems((prev) =>
         prev.map((item) =>
           item.actor.id === targetUserId
@@ -208,6 +423,8 @@ export function CommunityFeed() {
             : item
         )
       );
+
+      // Update trending creators in sidebar
       setSuggestedCreators((prev) =>
         prev.map((c) =>
           c.id === targetUserId
@@ -219,479 +436,345 @@ export function CommunityFeed() {
             : c
         )
       );
+
       setFollowingCount((prev) => Math.max(0, prev + (nextFollowing ? 1 : -1)));
+      showToast(nextFollowing ? "Creator followed" : "Creator unfollowed");
     } catch {
-      setActionError("Network error updating follow status.");
+      setActionError("Network error while updating follow status.");
     } finally {
       setBusyFollowIds((prev) => ({ ...prev, [targetUserId]: false }));
     }
   };
 
-  const handleToggleLike = async (projectId: string) => {
-    if (!isAuthenticated || busyLikeIds[projectId]) return;
-    setBusyLikeIds((prev) => ({ ...prev, [projectId]: true }));
-    setActionError(null);
-
-    try {
-      const res = await fetch(`/api/projects/${projectId}/like`, {
-        method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        setActionError(json.error?.message || "Could not update project like");
-        return;
+  // Handle Save / Unsave
+  const handleToggleSave = (projectId: string) => {
+    setSavedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+        showToast("Removed from saved collection");
+      } else {
+        next.add(projectId);
+        showToast("Saved to your collection");
       }
+      try {
+        localStorage.setItem("creativespace_saved_projects", JSON.stringify(Array.from(next)));
+      } catch {
+        // Storage fail-safe
+      }
+      return next;
+    });
+  };
 
-      setItems((prev) =>
-        prev.map((item) =>
-          item.project.id === projectId
-            ? {
-                ...item,
-                project: {
-                  ...item.project,
-                  hasLiked: Boolean(json.data.liked),
-                  likeCount: json.data.totalLikes ?? item.project.likeCount,
-                },
-              }
-            : item
-        )
-      );
-    } catch {
-      setActionError("Network error updating project like.");
-    } finally {
-      setBusyLikeIds((prev) => ({ ...prev, [projectId]: false }));
+  // Handle Share link copy
+  const handleCopyShareLink = (title: string, url: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      showToast(`Link to "${title}" copied to clipboard!`);
     }
   };
 
+  // Filter items based on active sidebar view
+  const displayedItems = useMemo(() => {
+    if (activeSidebarView === "saved") {
+      return items.filter((item) => savedProjectIds.has(item.project.id));
+    }
+    return items;
+  }, [items, activeSidebarView, savedProjectIds]);
+
   return (
-    <div className="relative flex-1 w-full bg-[radial-gradient(ellipse_75%_55%_at_50%_-15%,rgba(99,102,241,0.16),rgba(16,185,129,0.05)_55%,transparent)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-        {/* Editorial Cosmic-Nature Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-7 border-b border-slate-800/80">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-950/50 px-3 py-1 text-[11px] font-medium text-indigo-200 backdrop-blur-sm">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              <span>CreativeSpace Community Universe</span>
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-              Community Activity Feed
-            </h1>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Follow creators, explore published projects and finalized deliverables, and celebrate work across disciplines.
-            </p>
-          </div>
+    <div className="min-h-screen bg-[#F6F3EB] text-[#282B2A] selection:bg-[#203B35] selection:text-[#F6F3EB] flex flex-col">
+      {/* ============================================================ */}
+      {/* 1. PERSISTENT HEADER NAVIGATION (Section 4)                  */}
+      {/* ============================================================ */}
+      <CommunityHeader
+        onCreateClick={() => setIsCreateModalOpen(true)}
+        onMobileMenuToggle={() => setIsMobileDrawerOpen(true)}
+        unreadCount={unreadNotificationsCount}
+      />
 
-          {/* Feed Navigation: Following | Discover */}
-          <div className="inline-flex items-center rounded-xl border border-slate-800 bg-slate-900/70 p-1 backdrop-blur-md self-start md:self-auto">
-            <button
-              type="button"
-              onClick={() => setTab("following")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                tab === "following"
-                  ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-900/40"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              Following
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("discover")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                tab === "discover"
-                  ? "bg-gradient-to-r from-indigo-600 to-emerald-600 text-white shadow-md shadow-emerald-950/40"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              Discover
-            </button>
-          </div>
+      {/* Floating Action Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-full bg-[#203B35] text-[#F6F3EB] px-5 py-2.5 text-xs font-semibold shadow-2xl animate-fade-up flex items-center gap-2 border border-[#9DB5A5]/30">
+          <Sparkles className="h-3.5 w-3.5 text-[#9DB5A5]" />
+          <span>{toastMessage}</span>
         </div>
+      )}
 
-        {/* Category Filter Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto py-4 scrollbar-none">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-all ${
-                category === cat
-                  ? "border-emerald-500/60 bg-emerald-950/50 text-emerald-200 shadow-sm shadow-emerald-900/30"
-                  : "border-slate-800 bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* Action Error Banner */}
+      {actionError && (
+        <div className="bg-rose-50 border-b border-rose-200 px-4 py-2 text-center text-xs font-medium text-rose-800 flex items-center justify-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="ml-2 font-bold hover:underline"
+          >
+            Dismiss
+          </button>
         </div>
+      )}
 
-        {actionError && (
-          <div className="mb-5 p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{actionError}</span>
-          </div>
-        )}
+      {/* ============================================================ */}
+      {/* 2. THREE-COLUMN AUTHENTICATED COMMUNITY LAYOUT (Section 3)   */}
+      {/* ============================================================ */}
+      <div className="flex-1 mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8">
+        <div className="flex items-start justify-between gap-6 lg:gap-8">
+          {/* ========================================================== */}
+          {/* LEFT COLUMN: NAVIGATION & SHORTCUTS (Section 5)            */}
+          {/* ========================================================== */}
+          <aside className="hidden md:block w-60 xl:w-64 shrink-0 sticky top-[71px] h-[calc(100vh-71px)] overflow-y-auto">
+            <LeftNavSidebar
+              activeView={activeSidebarView}
+              onSelectView={(view) => {
+                setActiveSidebarView(view);
+                if (view === "following") {
+                  setFeedTab("following");
+                } else if (view === "home") {
+                  setFeedTab("for-you");
+                }
+              }}
+              incomingConnectionsCount={incomingConnectionsCount}
+              pendingCollaborationsCount={pendingCollaborationsCount}
+              savedCount={savedProjectIds.size}
+            />
+          </aside>
 
-        {/* Main 2-Column Editorial Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-2">
-          {/* Feed Column */}
-          <div className="lg:col-span-8 space-y-5">
-            {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((n) => (
-                  <SkeletonCard key={n} />
+          {/* ========================================================== */}
+          {/* CENTER COLUMN: CREATIVE COMMUNITY FEED (Section 6)         */}
+          {/* ========================================================== */}
+          <main className="flex-1 min-w-0 max-w-[680px] xl:max-w-[720px] py-6 mx-auto w-full space-y-5">
+            {/* Active Saved filter badge indicator */}
+            {activeSidebarView === "saved" && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF8F3] border border-[#203B35]/15">
+                <div className="flex items-center gap-2">
+                  <Bookmark className="h-4 w-4 text-[#203B35] fill-current" />
+                  <span className="text-xs font-bold text-[#203B35]">
+                    Viewing Saved Creative Works ({savedProjectIds.size})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveSidebarView("home")}
+                  className="text-xs font-semibold text-[#5D635F] hover:text-[#203B35]"
+                >
+                  Return to Feed
+                </button>
+              </div>
+            )}
+
+            {/* A. Category Filter Bar (Section 6.A) */}
+            <CategoryFilterBar
+              selectedCategory={selectedCategory}
+              onSelectCategory={(cat) => setSelectedCategory(cat)}
+            />
+
+            {/* B. Feed Tabs (Section 6.B) */}
+            <FeedTabsBar
+              activeTab={feedTab}
+              onChangeTab={(tab) => {
+                setFeedTab(tab);
+                setActiveSidebarView(tab === "following" ? "following" : "home");
+              }}
+              followingCount={followingCount}
+            />
+
+            {/* Error State */}
+            {error && (
+              <div className="p-6 rounded-2xl bg-rose-50/60 border border-rose-200 text-center space-y-3">
+                <p className="text-sm font-semibold text-rose-800">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => fetchFeed(null)}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#203B35] text-[#F6F3EB] text-xs font-semibold hover:bg-[#162A26] transition-all"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+
+            {/* Loading Skeletons */}
+            {isLoading && (
+              <div className="space-y-5">
+                {[1, 2].map((n) => (
+                  <div
+                    key={n}
+                    className="p-5 rounded-2xl bg-[#FAF8F3] border border-[#203B35]/10 space-y-4 animate-pulse"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-[#EFECE2]" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3 w-32 rounded bg-[#EFECE2]" />
+                        <div className="h-2.5 w-20 rounded bg-[#EFECE2]" />
+                      </div>
+                    </div>
+                    <div className="h-72 w-full rounded-xl bg-[#EFECE2]" />
+                    <div className="space-y-2">
+                      <div className="h-4 w-3/4 rounded bg-[#EFECE2]" />
+                      <div className="h-3 w-full rounded bg-[#EFECE2]" />
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : error ? (
-              <ErrorState message={error} onRetry={() => fetchFeed(null)} />
-            ) : tab === "following" && !isAuthenticated ? (
-              <EmptyState
-                icon={<Users className="w-11 h-11 text-indigo-400" />}
-                title="Sign in to follow creators"
-                description="Create your personalized timeline of published projects and new versions from creators you admire."
-              />
-            ) : items.length === 0 ? (
-              tab === "following" && followingCount === 0 ? (
-                <EmptyState
-                  icon={<Sparkles className="w-11 h-11 text-emerald-400" />}
-                  title="Your Following feed is ready to bloom"
-                  description="You are not following any creators yet. Follow artists from the Discover tab or the suggested creators panel to see their latest published work here."
-                  actionLabel="Explore Discover Feed"
-                  onAction={() => setTab("discover")}
-                />
-              ) : tab === "following" ? (
-                <EmptyState
-                  icon={<Clock className="w-11 h-11 text-indigo-400" />}
-                  title="No recent public activity yet"
-                  description="Creators you follow have not published new public projects or approved versions in this filter yet. Check Discover for fresh community work."
-                  actionLabel="Browse Discover"
-                  onAction={() => setTab("discover")}
-                />
-              ) : (
-                <EmptyState
-                  icon={<Compass className="w-11 h-11 text-violet-400" />}
-                  title="No published community activity found"
-                  description="No public projects or finalized versions match this category yet. Publish a public project from your workspace to kick off the community feed."
-                />
-              )
-            ) : (
-              <>
-                {items.map((item) => {
-                  const isOwnItem = Boolean(currentUserId && currentUserId === item.actor.id);
-                  const followBusy = Boolean(busyFollowIds[item.actor.id]);
-                  const likeBusy = Boolean(busyLikeIds[item.project.id]);
-                  const targetHref = item.version
-                    ? `/projects/${item.project.id}?tab=versions&versionId=${item.version.id}`
-                    : `/projects/${item.project.id}`;
+            )}
 
-                  return (
-                    <article
-                      key={item.id}
-                      className="group rounded-2xl border border-slate-800/90 bg-slate-900/50 hover:border-indigo-500/40 hover:bg-slate-900/75 backdrop-blur-md transition-all p-5 sm:p-6 shadow-lg shadow-slate-950/30 space-y-4"
-                    >
-                      {/* Card Header: Creator + Activity Context + Follow */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Link
-                            href={`/profile/${item.actor.username}`}
-                            className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-emerald-500 flex items-center justify-center text-sm font-bold text-white overflow-hidden shrink-0 shadow-md shadow-indigo-950/50"
-                          >
-                            {item.actor.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={item.actor.avatarUrl}
-                                alt={item.actor.displayName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              item.actor.displayName.charAt(0).toUpperCase()
-                            )}
-                          </Link>
+            {/* Feed Post Cards List */}
+            {!isLoading && displayedItems.length > 0 && (
+              <div className="space-y-5">
+                {displayedItems.map((post, idx) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    index={idx}
+                    onToggleLike={handleToggleLike}
+                    onToggleFollow={handleToggleFollow}
+                    onToggleSave={handleToggleSave}
+                    isSaved={savedProjectIds.has(post.project.id)}
+                    isLikeBusy={Boolean(busyLikeIds[post.project.id])}
+                    isFollowBusy={Boolean(busyFollowIds[post.actor.id])}
+                    onCopyShareLink={handleCopyShareLink}
+                  />
+                ))}
 
-                          <div className="min-w-0">
-                            <p className="text-sm text-slate-300 leading-snug">
-                              <Link
-                                href={`/profile/${item.actor.username}`}
-                                className="font-bold text-white hover:text-indigo-300 transition-colors"
-                              >
-                                {item.actor.displayName}
-                              </Link>{" "}
-                              <span className="text-slate-400">{item.summary}</span>
-                            </p>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                              <Link
-                                href={`/profile/${item.actor.username}`}
-                                className="font-mono hover:text-slate-300"
-                              >
-                                @{item.actor.username}
-                              </Link>
-                              <span>·</span>
-                              <span>{formatRelativeDate(item.createdAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {isAuthenticated && !isOwnItem && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={item.actor.isFollowing ? "secondary" : "outline"}
-                            disabled={followBusy}
-                            onClick={() =>
-                              handleToggleFollow(item.actor.id, item.actor.isFollowing)
-                            }
-                            className="gap-1.5 text-xs shrink-0 h-8"
-                          >
-                            {item.actor.isFollowing ? (
-                              <>
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                Following
-                              </>
-                            ) : (
-                              <>
-                                <UserPlus className="w-3.5 h-3.5 text-indigo-300" />
-                                Follow
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Safe Published Media Preview (never draft/private media) */}
-                      {item.project.previewImageUrl && (
-                        <Link
-                          href={targetHref}
-                          className="block rounded-xl overflow-hidden border border-slate-800/80 bg-slate-950/70 max-h-80"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.project.previewImageUrl}
-                            alt={item.project.title}
-                            className="w-full h-full max-h-80 object-cover group-hover:scale-[1.01] transition-transform duration-300"
-                          />
-                        </Link>
-                      )}
-
-                      {/* Creative Work Summary */}
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-800/50">
-                            {item.project.category}
-                          </span>
-                          {item.version && (
-                            <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                                item.version.status === "Final"
-                                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-700/60"
-                                  : "bg-sky-950/60 text-sky-300 border-sky-800/60"
-                              }`}
-                            >
-                              {item.version.status === "Final" ? (
-                                <Award className="w-3 h-3" />
-                              ) : (
-                                <GitBranch className="w-3 h-3" />
-                              )}
-                              v{item.version.versionNumber} · {item.version.status}
-                            </span>
-                          )}
-                          {item.type === "PortfolioPublished" && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60">
-                              <Award className="w-3 h-3" />
-                              Portfolio Showcase
-                            </span>
-                          )}
-                        </div>
-
-                        <Link href={targetHref} className="block">
-                          <h2 className="text-lg sm:text-xl font-bold text-white group-hover:text-indigo-200 transition-colors">
-                            {item.project.title}
-                          </h2>
-                        </Link>
-
-                        {item.project.description && (
-                          <p className="text-sm text-slate-400 leading-relaxed line-clamp-3">
-                            {item.project.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Interaction Footer (Existing Like, Comment, & Project View APIs) */}
-                      <div className="pt-3 border-t border-slate-800/70 flex items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            disabled={!isAuthenticated || likeBusy}
-                            onClick={() => handleToggleLike(item.project.id)}
-                            title={isAuthenticated ? "Like project" : "Sign in to like"}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${
-                              item.project.hasLiked
-                                ? "border-rose-700/60 bg-rose-950/40 text-rose-300"
-                                : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-rose-500/40 hover:text-rose-300"
-                            } disabled:opacity-60`}
-                          >
-                            <Heart
-                              className={`w-3.5 h-3.5 ${
-                                item.project.hasLiked ? "fill-rose-500 text-rose-500" : ""
-                              }`}
-                            />
-                            <span>{item.project.likeCount}</span>
-                          </button>
-
-                          <Link
-                            href={targetHref}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950/50 text-slate-300 hover:border-indigo-500/40 hover:text-indigo-200 transition-colors"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>{item.project.commentCount}</span>
-                          </Link>
-                        </div>
-
-                        <Link
-                          href={targetHref}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 hover:text-emerald-200 transition-colors"
-                        >
-                          <span>View Work</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </article>
-                  );
-                })}
-
-                {/* Cursor Pagination Control */}
-                {hasMore && nextCursor && (
-                  <div className="pt-3 flex justify-center">
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      isLoading={isLoadingMore}
+                {/* Pagination button */}
+                {hasMore && (
+                  <div className="pt-4 pb-8 text-center">
+                    <button
+                      type="button"
+                      disabled={isLoadingMore}
                       onClick={() => fetchFeed(nextCursor)}
-                      className="min-w-[180px]"
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FAF8F3] border border-[#203B35]/20 text-xs font-semibold text-[#203B35] hover:bg-[#EFECE2] hover:border-[#203B35]/40 transition-all shadow-sm disabled:opacity-50"
                     >
-                      Load More Activity
-                    </Button>
+                      {isLoadingMore ? (
+                        <>
+                          <span className="animate-spin text-xs">···</span>
+                          <span>Loading more works...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 text-[#9DB5A5]" />
+                          <span>Load More Creative Works</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
 
-          {/* Right Sidebar: Creator Discovery & Quick Links */}
-          <aside className="lg:col-span-4 space-y-6">
-            <div className="rounded-2xl border border-slate-800/90 bg-slate-900/50 backdrop-blur-md p-5 space-y-4 sticky top-24">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
-                    Creators to Follow
+            {/* Empty State */}
+            {!isLoading && displayedItems.length === 0 && !error && (
+              <div className="py-16 text-center rounded-2xl bg-[#FAF8F3] border border-[#203B35]/10 p-8 space-y-4">
+                <div className="mx-auto h-12 w-12 rounded-full bg-[#EFECE2] flex items-center justify-center text-[#203B35]">
+                  <Compass className="h-6 w-6 text-[#203B35]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-[#203B35]">
+                    {activeSidebarView === "saved"
+                      ? "No saved creative works yet"
+                      : feedTab === "following"
+                      ? "No activity from creators you follow"
+                      : `No creative posts found in ${selectedCategory}`}
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Discover active creators sharing public projects.
+                  <p className="text-xs text-[#5D635F] max-w-sm mx-auto leading-relaxed">
+                    {activeSidebarView === "saved"
+                      ? "Click the bookmark icon on any creative post to build your personal inspiration collection."
+                      : feedTab === "following"
+                      ? "Follow inspiring illustrators, photographers, animators, and designers to see their newest works here."
+                      : "Explore all categories or be the first to publish creative work in this discipline!"}
                   </p>
                 </div>
-              </div>
-
-              {suggestedCreators.length === 0 ? (
-                <p className="text-xs text-slate-500 py-3">
-                  You&apos;re all caught up on suggested creators! Explore{" "}
-                  <Link href="/discover" className="text-indigo-400 hover:underline">
-                    Discover
-                  </Link>{" "}
-                  for more projects.
-                </p>
-              ) : (
-                <div className="space-y-3.5">
-                  {suggestedCreators.map((creator) => {
-                    const busy = Boolean(busyFollowIds[creator.id]);
-                    return (
-                      <div
-                        key={creator.id}
-                        className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-800/70 bg-slate-950/50 hover:border-indigo-500/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Link
-                            href={`/profile/${creator.username}`}
-                            className="w-9 h-9 rounded-lg bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden"
-                          >
-                            {creator.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={creator.avatarUrl}
-                                alt={creator.displayName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              creator.displayName.charAt(0).toUpperCase()
-                            )}
-                          </Link>
-                          <div className="min-w-0">
-                            <Link
-                              href={`/profile/${creator.username}`}
-                              className="text-xs font-bold text-white hover:text-indigo-300 block truncate"
-                            >
-                              {creator.displayName}
-                            </Link>
-                            <p className="text-[11px] text-slate-400 font-mono truncate">
-                              @{creator.username}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              {creator.publicProjectCount} public{" "}
-                              {creator.publicProjectCount === 1 ? "work" : "works"} ·{" "}
-                              {creator.followerCount} followers
-                            </p>
-                          </div>
-                        </div>
-
-                        {isAuthenticated ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={creator.isFollowing ? "secondary" : "primary"}
-                            disabled={busy}
-                            onClick={() =>
-                              handleToggleFollow(creator.id, creator.isFollowing)
-                            }
-                            className="text-[11px] px-2.5 h-7 shrink-0"
-                          >
-                            {creator.isFollowing ? "Following" : "Follow"}
-                          </Button>
-                        ) : (
-                          <Link href={`/profile/${creator.username}`}>
-                            <Button variant="ghost" size="sm" className="text-[11px] px-2 h-7">
-                              View
-                            </Button>
-                          </Link>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <Link
-                  href="/discover"
-                  className="text-indigo-300 hover:text-indigo-200 font-medium inline-flex items-center gap-1"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  Browse Full Catalog
-                </Link>
-                {isAuthenticated && (
-                  <Link
-                    href="/dashboard"
-                    className="text-slate-400 hover:text-white transition-colors"
+                {feedTab === "following" && (
+                  <button
+                    type="button"
+                    onClick={() => setFeedTab("for-you")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#203B35] text-[#F6F3EB] text-xs font-semibold hover:bg-[#162A26] transition-all"
                   >
-                    My Workspace →
-                  </Link>
+                    <span>Explore Community Discovery</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[#9DB5A5]" />
+                  </button>
                 )}
               </div>
-            </div>
+            )}
+          </main>
+
+          {/* ========================================================== */}
+          {/* RIGHT COLUMN: COMMUNITY DISCOVERY (Section 7)              */}
+          {/* ========================================================== */}
+          <aside className="hidden lg:block w-80 xl:w-88 shrink-0 sticky top-[71px] h-[calc(100vh-71px)] overflow-y-auto py-6">
+            <RightDiscoverySidebar
+              creators={suggestedCreators}
+              onToggleFollow={handleToggleFollow}
+              busyFollowIds={busyFollowIds}
+              selectedCategory={selectedCategory}
+              onSelectTopic={(category) => {
+                setSelectedCategory(category);
+                setFeedTab("for-you");
+              }}
+            />
           </aside>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* 3. MOBILE NAVIGATION DRAWER                                  */}
+      {/* ============================================================ */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex" role="dialog" aria-modal="true">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-[#162A26]/50 backdrop-blur-sm"
+            onClick={() => setIsMobileDrawerOpen(false)}
+          />
+
+          {/* Drawer container */}
+          <div className="relative w-72 max-w-[80vw] bg-[#FAF8F3] h-full shadow-2xl p-5 flex flex-col justify-between overflow-y-auto z-10 border-r border-[#203B35]/15">
+            <div className="flex items-center justify-between pb-4 border-b border-[#203B35]/10">
+              <span className="text-xs font-bold font-mono uppercase tracking-wider text-[#203B35]">
+                Navigation
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 rounded-full text-[#92958F] hover:text-[#203B35]"
+                aria-label="Close navigation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <LeftNavSidebar
+              activeView={activeSidebarView}
+              onSelectView={(view) => {
+                setActiveSidebarView(view);
+                if (view === "following") {
+                  setFeedTab("following");
+                } else if (view === "home") {
+                  setFeedTab("for-you");
+                }
+              }}
+              incomingConnectionsCount={incomingConnectionsCount}
+              pendingCollaborationsCount={pendingCollaborationsCount}
+              savedCount={savedProjectIds.size}
+              onItemClick={() => setIsMobileDrawerOpen(false)}
+              className="py-4"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 4. CREATE PROJECT MODAL                                      */}
+      {/* ============================================================ */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          fetchFeed(null);
+          showToast("New creative work published to community feed!");
+        }}
+      />
     </div>
   );
 }

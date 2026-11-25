@@ -22,13 +22,16 @@ export async function GET() {
         email: true,
         username: true,
         displayName: true,
+        role: true,
         bio: true,
         avatarUrl: true,
         disciplines: true,
         socialLinks: true,
         socialPrivacy: true,
+        timezone: true,
         isAdmin: true,
         createdAt: true,
+        updatedAt: true,
         portfolio: {
           select: {
             id: true,
@@ -82,6 +85,9 @@ export async function PATCH(req: NextRequest) {
     if (validatedData.socialPrivacy !== undefined) {
       updatePayload.socialPrivacy = validatedData.socialPrivacy;
     }
+    if (validatedData.timezone !== undefined) {
+      updatePayload.timezone = validatedData.timezone.trim();
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: currentUser.id },
@@ -91,11 +97,13 @@ export async function PATCH(req: NextRequest) {
         email: true,
         username: true,
         displayName: true,
+        role: true,
         bio: true,
         avatarUrl: true,
         disciplines: true,
         socialLinks: true,
         socialPrivacy: true,
+        timezone: true,
         isAdmin: true,
         updatedAt: true,
       },

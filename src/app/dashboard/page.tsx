@@ -273,24 +273,33 @@ function DashboardContent() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider text-violet-400">
-              Creator Workspace
+              {session?.user?.role === "VIEWER" ? "Viewer Space" : "Creator Workspace"}
             </span>
             <span className="text-slate-600">•</span>
             <span className="text-xs text-slate-400">@{session?.user?.username}</span>
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Projects & Studio
+            {session?.user?.role === "VIEWER" ? "Community & Discoveries" : "Projects & Studio"}
           </h1>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="gap-2 shadow-lg shadow-violet-600/25"
-          >
-            <Plus className="w-4 h-4" />
-            New Project
-          </Button>
+          {session?.user?.role !== "VIEWER" ? (
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="gap-2 shadow-lg shadow-violet-600/25"
+            >
+              <Plus className="w-4 h-4" />
+              New Project
+            </Button>
+          ) : (
+            <Link href="/discover">
+              <Button variant="outline" className="gap-2 border-slate-700 hover:bg-slate-800 text-slate-200">
+                <Compass className="w-4 h-4 text-violet-400" />
+                Discover Creators
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -424,14 +433,34 @@ function DashboardContent() {
             ) : filteredProjects.length === 0 ? (
               <EmptyState
                 icon={<FolderPlus className="w-12 h-12 text-violet-400" />}
-                title={projects.length === 0 ? "No creative projects yet" : "No matching projects"}
+                title={
+                  projects.length === 0
+                    ? session?.user?.role === "VIEWER"
+                      ? "No projects in your workspace"
+                      : "No creative projects yet"
+                    : "No matching projects"
+                }
                 description={
                   projects.length === 0
-                    ? "Start your first project to organize assets, coordinate collaborator drafts, and showcase finished work in your portfolio."
+                    ? session?.user?.role === "VIEWER"
+                      ? "As a Viewer, you can discover creative projects, follow inspiring creators, and engage with the community."
+                      : "Start your first project to organize assets, coordinate collaborator drafts, and showcase finished work in your portfolio."
                     : "Try adjusting your search terms, role filters, or status toggles."
                 }
-                actionLabel={projects.length === 0 ? "Create First Project" : undefined}
-                onAction={() => setIsCreateModalOpen(true)}
+                actionLabel={
+                  projects.length === 0
+                    ? session?.user?.role === "VIEWER"
+                      ? "Explore Community Works"
+                      : "Create First Project"
+                    : undefined
+                }
+                onAction={() => {
+                  if (session?.user?.role === "VIEWER") {
+                    router.push("/discover");
+                  } else {
+                    setIsCreateModalOpen(true);
+                  }
+                }}
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

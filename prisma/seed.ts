@@ -1,4 +1,4 @@
-import { PrismaClient, ProjectStatus, Visibility, CollaboratorRole, VersionStatus, NotificationType, ReportStatus, ReportTargetType } from "@prisma/client";
+import { PrismaClient, ProjectStatus, Visibility, CollaboratorRole, InvitationStatus, VersionStatus, NotificationType, ReportStatus, ReportTargetType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -158,6 +158,7 @@ async function main() {
       projectId: anyaProject.id,
       userId: anya.id,
       role: CollaboratorRole.Owner,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -168,6 +169,7 @@ async function main() {
       projectId: anyaProject.id,
       userId: david.id,
       role: CollaboratorRole.ClientReviewer,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -298,6 +300,7 @@ async function main() {
       projectId: rohanProject.id,
       userId: rohan.id,
       role: CollaboratorRole.Owner,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -308,6 +311,7 @@ async function main() {
       projectId: rohanProject.id,
       userId: anya.id,
       role: CollaboratorRole.Collaborator,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -317,6 +321,7 @@ async function main() {
       projectId: rohanProject.id,
       userId: grace.id,
       role: CollaboratorRole.Collaborator,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -376,6 +381,7 @@ async function main() {
       projectId: graceProject.id,
       userId: grace.id,
       role: CollaboratorRole.Owner,
+      status: InvitationStatus.Accepted,
       acceptedAt: new Date(),
     },
   });
@@ -414,24 +420,36 @@ async function main() {
 
   // 6. Seed Likes & Follows
   console.log("Seeding interaction graph: likes and follows...");
-  await prisma.like.create({
-    data: { userId: david.id, projectId: anyaProject.id },
+  await prisma.like.upsert({
+    where: { userId_projectId: { userId: david.id, projectId: anyaProject.id } },
+    create: { userId: david.id, projectId: anyaProject.id },
+    update: {},
   });
-  await prisma.like.create({
-    data: { userId: rohan.id, projectId: anyaProject.id },
+  await prisma.like.upsert({
+    where: { userId_projectId: { userId: rohan.id, projectId: anyaProject.id } },
+    create: { userId: rohan.id, projectId: anyaProject.id },
+    update: {},
   });
-  await prisma.like.create({
-    data: { userId: anya.id, projectId: rohanProject.id },
+  await prisma.like.upsert({
+    where: { userId_projectId: { userId: anya.id, projectId: rohanProject.id } },
+    create: { userId: anya.id, projectId: rohanProject.id },
+    update: {},
   });
-  await prisma.like.create({
-    data: { userId: david.id, projectId: graceProject.id },
+  await prisma.like.upsert({
+    where: { userId_projectId: { userId: david.id, projectId: graceProject.id } },
+    create: { userId: david.id, projectId: graceProject.id },
+    update: {},
   });
 
-  await prisma.follow.create({
-    data: { followerId: david.id, followingId: anya.id },
+  await prisma.follow.upsert({
+    where: { followerId_followingId: { followerId: david.id, followingId: anya.id } },
+    create: { followerId: david.id, followingId: anya.id },
+    update: {},
   });
-  await prisma.follow.create({
-    data: { followerId: rohan.id, followingId: grace.id },
+  await prisma.follow.upsert({
+    where: { followerId_followingId: { followerId: rohan.id, followingId: grace.id } },
+    create: { followerId: rohan.id, followingId: grace.id },
+    update: {},
   });
 
   // 7. Seed Sample Report for Admin Testing

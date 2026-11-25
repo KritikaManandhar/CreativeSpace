@@ -129,6 +129,11 @@ export async function POST(req: NextRequest) {
       return apiError("UNAUTHORIZED", "Authentication required", 401);
     }
 
+    // Role Enforcement: Only Creators (and platform Admins) can create projects
+    if (user.role !== "CREATOR" && !user.isAdmin) {
+      return apiError("FORBIDDEN", "Only creators can create new projects", 403);
+    }
+
     const body = await req.json();
     const validatedData = CreateProjectSchema.parse(body);
 

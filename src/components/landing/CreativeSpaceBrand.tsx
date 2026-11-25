@@ -100,14 +100,14 @@ export function CelestialSpark({
 /** Refined creator avatar badge with subtle botanical-studio gradient */
 export function CreatorAvatar({
   initials,
-  tone,
-  accent,
+  tone = "#203B35",
+  accent = "#9DB5A5",
   name,
   size = "sm",
 }: {
   initials: string;
-  tone: string;
-  accent: string;
+  tone?: string;
+  accent?: string;
   name: string;
   size?: "xs" | "sm" | "md";
 }) {
