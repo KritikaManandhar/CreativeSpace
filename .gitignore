@@ -25,6 +25,13 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+.env.test
+
+# database backups (never commit database dumps)
+/backups/
+*.dump
+*.backup
+*.pgdump
 
 # vercel
 .vercel
