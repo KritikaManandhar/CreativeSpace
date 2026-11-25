@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
 import { evaluateProjectEditPageAccess } from "@/lib/page-auth";
-import { ProjectEditPage } from "@/components/project-edit/ProjectEditPage";
+import { TemporaryPagePlaceholder } from "@/components/placeholder/TemporaryPagePlaceholder";
 
 export const dynamic = "force-dynamic";
 
@@ -56,5 +56,15 @@ export default async function Page({ params }: PageProps) {
     );
   }
 
-  return <ProjectEditPage />;
+  return (
+    <TemporaryPagePlaceholder
+      title="Edit Project"
+      routeLabel="/projects/[id]/edit"
+      description="Old project settings and edit UI has been removed for upcoming redesign. Owner authorization guard and PATCH/DELETE logic remain preserved."
+      contextItems={[
+        { label: "Access Control", value: "Owner Verified via evaluateProjectEditPageAccess" },
+        { label: "Extracted Logic", value: "src/lib/features/project-edit.ts" },
+      ]}
+    />
+  );
 }

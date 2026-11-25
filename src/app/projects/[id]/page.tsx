@@ -1,6 +1,6 @@
 import React from "react";
 import type { Metadata } from "next";
-import { ProjectDetailPage } from "@/components/project-detail/ProjectDetailPage";
+import { TemporaryPagePlaceholder } from "@/components/placeholder/TemporaryPagePlaceholder";
 
 export const metadata: Metadata = {
   title: "Creative Work Exhibition — CreativeSpace 2.0",
@@ -9,5 +9,15 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <ProjectDetailPage />;
+  return (
+    <TemporaryPagePlaceholder
+      title="Project Workspace"
+      routeLabel="/projects/[id]"
+      description="Old project detail, version timeline, assets, and threaded comments UI has been removed for upcoming redesign. RBAC visibility and upload/version APIs remain intact."
+      contextItems={[
+        { label: "Extracted Logic", value: "src/lib/features/project-detail.ts, assets.ts, comments.ts" },
+        { label: "Backend APIs", value: "/api/projects/[id], /versions, /assets, /comments" },
+      ]}
+    />
+  );
 }

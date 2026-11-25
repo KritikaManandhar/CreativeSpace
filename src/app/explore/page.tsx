@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ExplorePage } from "@/components/explore/ExplorePage";
+import { TemporaryPagePlaceholder } from "@/components/placeholder/TemporaryPagePlaceholder";
 
 export const metadata: Metadata = {
   title: "Explore — Discover Ideas & Creators | CreativeSpace",
@@ -8,5 +8,15 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <ExplorePage />;
+  return (
+    <TemporaryPagePlaceholder
+      title="Explore"
+      routeLabel="/explore"
+      description="Old explore discovery gallery and mock dataset have been removed for upcoming redesign. Public discovery and search endpoints remain active."
+      contextItems={[
+        { label: "Extracted Logic", value: "src/lib/features/discover.ts" },
+        { label: "Backend APIs", value: "/api/discover, /api/search" },
+      ]}
+    />
+  );
 }

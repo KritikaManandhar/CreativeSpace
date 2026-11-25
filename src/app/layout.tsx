@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -45,9 +43,7 @@ export default function RootLayout({
     >
       <body className="font-sans bg-[#0C0B0A] text-[#F5F0E8] antialiased min-h-screen flex flex-col selection:bg-[#E85D3F] selection:text-white">
         <AuthProvider>
-          <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
-          <Footer />
         </AuthProvider>
       </body>
     </html>
