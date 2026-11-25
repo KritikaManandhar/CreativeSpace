@@ -23,6 +23,7 @@ declare module "next-auth" {
     isAdmin: boolean;
     avatarUrl?: string | null;
     disciplines?: string[];
+    securityStamp?: string;
   }
 }
 
@@ -35,5 +36,7 @@ declare module "next-auth/jwt" {
     isAdmin: boolean;
     avatarUrl?: string | null;
     disciplines?: string[];
+    securityStamp?: string;
+    sessionInvalid?: boolean;
   }
 }

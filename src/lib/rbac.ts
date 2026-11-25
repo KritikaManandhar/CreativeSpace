@@ -22,6 +22,22 @@ export interface AuthUser {
   email?: string | null;
   username?: string | null;
   isAdmin?: boolean;
+  emailVerified?: Date | string | boolean | null;
+  suspendedAt?: Date | string | null;
+  isSuspended?: boolean | null;
+}
+
+function isEligibleAuthUser(user: AuthUser | null | undefined): user is AuthUser {
+  if (!user || !user.id) return false;
+  if (user.suspendedAt || user.isSuspended) return false;
+  if (
+    Object.prototype.hasOwnProperty.call(user, "emailVerified") &&
+    user.emailVerified !== undefined &&
+    !user.emailVerified
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export interface AuthorizationResult {
@@ -95,10 +111,11 @@ export async function authorize(
   projectId: string,
   action: ProjectAction
 ): Promise<AuthorizationResult> {
-  const { role, project } = await getEffectiveRole(user?.id, projectId);
+  const activeUser = isEligibleAuthUser(user) ? user : null;
+  const { role, project } = await getEffectiveRole(activeUser?.id, projectId);
 
   // Platform Admin override for viewing and moderation
-  if (user?.isAdmin && action === "view_project") {
+  if (activeUser?.isAdmin && action === "view_project") {
     return { authorized: true, role, project };
   }
 
@@ -117,15 +134,15 @@ export async function authorize(
     );
   }
 
-  // All other actions require authentication
-  if (!user) {
+  // All other actions require an active, verified authenticated user
+  if (!activeUser) {
     throw new AppError("UNAUTHORIZED", "Authentication required", 401);
   }
 
   // Role permissions per PRD Section 18 & TRD Section 13
   switch (action) {
     case "manage_settings":
-      if (role !== "Owner" && !user?.isAdmin) {
+      if (role !== "Owner" && !activeUser.isAdmin) {
         throw new AppError(
           "FORBIDDEN",
           `Only the project owner or authorized administrator can perform this action: ${action}`,
@@ -140,7 +157,7 @@ export async function authorize(
     case "publish_portfolio":
     case "designate_final_version":
     case "delete_version":
-      if (role !== "Owner" && !user?.isAdmin) {
+      if (role !== "Owner" && !activeUser.isAdmin) {
         throw new AppError(
           "FORBIDDEN",
           `Only the project owner can perform this action: ${action}`,

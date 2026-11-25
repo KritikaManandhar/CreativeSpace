@@ -659,7 +659,12 @@ export function ProjectDetailPage() {
         isInviteOpen={isInviteOpen}
         onCloseInvite={() => setIsInviteOpen(false)}
         onSuccess={fetchProjectData}
-        availableAssets={project.assets}
+        availableAssets={project.assets.filter((a) => {
+          if (a.versionId) return false;
+          if (project.userRole === "Owner") return true;
+          const assetUploaderId = a.uploaderId ?? a.uploader?.id;
+          return Boolean(session?.user?.id && assetUploaderId === session.user.id);
+        })}
       />
 
       {/* 10. Editorial Footer */}

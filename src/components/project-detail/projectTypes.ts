@@ -6,6 +6,7 @@ export type VersionStatus = "Draft" | "Approved" | "Final" | "Rejected";
 export interface ProjectAsset {
   id: string;
   projectId: string;
+  uploaderId?: string;
   versionId: string | null;
   fileName: string;
   mimeType: string;

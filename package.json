@@ -18,8 +18,9 @@
     "test:collaboration": "ts-node tests/phase3-3-collaboration.test.ts",
     "test:feed": "ts-node tests/phase3-4-feed.test.ts",
     "test:storage-security": "ts-node tests/phase3-9-storage-security.test.ts",
+    "test:auth-security": "ts-node tests/auth-security-hardening.test.ts",
     "test:pg": "ts-node tests/phase3-5-pg-integration.test.ts",
-    "test:all": "ts-node tests/phase1-rbac-security.test.ts && ts-node tests/phase2-version-lifecycle.test.ts && ts-node tests/phase3-1-connections.test.ts && ts-node tests/phase3-2-discussions.test.ts && ts-node tests/phase3-3-collaboration.test.ts && ts-node tests/phase3-4-feed.test.ts && ts-node tests/phase3-9-storage-security.test.ts"
+    "test:all": "ts-node tests/phase1-rbac-security.test.ts && ts-node tests/phase2-version-lifecycle.test.ts && ts-node tests/phase3-1-connections.test.ts && ts-node tests/phase3-2-discussions.test.ts && ts-node tests/phase3-3-collaboration.test.ts && ts-node tests/phase3-4-feed.test.ts && ts-node tests/phase3-9-storage-security.test.ts && ts-node tests/auth-security-hardening.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",

@@ -89,10 +89,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const projectId = params.id;
 
     // RBAC: Owner and Collaborators can create versions
-    await authorize(user, projectId, "create_version");
+    const { role } = await authorize(user, projectId, "create_version");
 
     const body = await req.json();
     const validatedData = CreateVersionSchema.parse(body);
+    const uniqueAssetIds = Array.from(new Set(validatedData.assetIds || []));
 
     const MAX_RETRIES = 3;
     let attempt = 0;
@@ -113,21 +114,55 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             }
           }
 
-          // 2. Validate asset ownership - Prevent cross-project asset linkage
-          if (validatedData.assetIds && validatedData.assetIds.length > 0) {
+          // 2. Validate asset ownership, project binding, and unlinked state before attachment
+          if (uniqueAssetIds.length > 0) {
             const matchingAssets = await tx.asset.findMany({
               where: {
-                id: { in: validatedData.assetIds },
+                id: { in: uniqueAssetIds },
                 projectId,
               },
-              select: { id: true },
+              select: {
+                id: true,
+                projectId: true,
+                uploaderId: true,
+                versionId: true,
+              },
             });
-            if (matchingAssets.length !== validatedData.assetIds.length) {
+
+            const matchedById = new Map(matchingAssets.map((a) => [a.id, a]));
+            const hasMissingOrForeignProject = uniqueAssetIds.some((id) => {
+              const found = matchedById.get(id);
+              return !found || found.projectId !== projectId;
+            });
+
+            if (hasMissingOrForeignProject) {
               throw new AppError(
                 "BAD_REQUEST",
                 "One or more assets do not belong to this project or do not exist",
                 400
               );
+            }
+
+            const alreadyLinkedAsset = matchingAssets.find(
+              (a) => a.versionId !== null && a.versionId !== undefined
+            );
+            if (alreadyLinkedAsset) {
+              throw new AppError(
+                "CONFLICT",
+                "One or more selected assets are already linked to an existing version and cannot be re-linked",
+                409
+              );
+            }
+
+            if (role !== "Owner") {
+              const peerAsset = matchingAssets.find((a) => a.uploaderId !== user!.id);
+              if (peerAsset) {
+                throw new AppError(
+                  "FORBIDDEN",
+                  "Collaborators can only attach their own unlinked assets when creating a version",
+                  403
+                );
+              }
             }
           }
 
@@ -150,17 +185,26 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             },
           });
 
-          // 5. Strict Locking Hierarchy - Level 3: Link assets to this version
-          if (validatedData.assetIds && validatedData.assetIds.length > 0) {
-            await tx.asset.updateMany({
+          // 5. Strict Locking Hierarchy - Level 3: Atomically link eligible unlinked assets
+          if (uniqueAssetIds.length > 0) {
+            const linkResult = await tx.asset.updateMany({
               where: {
-                id: { in: validatedData.assetIds },
+                id: { in: uniqueAssetIds },
                 projectId,
+                versionId: null,
+                ...(role !== "Owner" ? { uploaderId: user!.id } : {}),
               },
               data: {
                 versionId: version.id,
               },
             });
+            if (linkResult.count !== uniqueAssetIds.length) {
+              throw new AppError(
+                "CONFLICT",
+                "One or more selected assets could not be linked because their ownership or attachment state changed",
+                409
+              );
+            }
           }
 
           // 6. Add revision notes as comment if provided
