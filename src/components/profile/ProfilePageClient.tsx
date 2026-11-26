@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { MotionConfig, AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, Sparkles, X } from "lucide-react";
+import { Eye, PencilLine, RotateCcw, Sparkles, X } from "lucide-react";
 import type { ViewerConnectionState } from "@/lib/features/profile";
 import {
   resolveMockProfile,
+  SAMPLE_PROFILE_LINKS,
   type ProfilePerspective,
   type ProfilePostComment,
   type ProfilePostItem,
@@ -13,7 +15,7 @@ import {
   type ProfileServiceItem,
   type UserProfileRecord,
 } from "@/data/mockProfiles";
-import { ProfileNavbar } from "./ProfileNavbar";
+import { AuthenticatedNavbar } from "@/components/navigation/AuthenticatedNavbar";
 import { ProfileHeroSection } from "./ProfileHeroSection";
 import { ProfileShowcaseTabs, type ProfileTab } from "./ProfileShowcaseTabs";
 import { EditProfileModal } from "./EditProfileModal";
@@ -233,15 +235,93 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           <div className="absolute top-[22%] -left-28 h-[380px] w-[380px] rounded-full bg-[#9DB5A5]/15 blur-[110px]" />
         </div>
 
-        {/* Sticky Editorial Top Navigation */}
-        <ProfileNavbar
-          activeUsername={profile.username}
-          perspective={perspective}
-          onPerspectiveChange={setPerspective}
-        />
+        {/* Shared Consistent Authenticated Top Navigation */}
+        <AuthenticatedNavbar />
 
         {/* Main Profile Container */}
         <main className="relative z-10 mx-auto w-full max-w-[1320px] flex-1 px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8">
+          {/* Profile-Specific Perspective (Owner View / Visitor View) Control Toolbar */}
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] px-4 sm:px-5 py-3 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EFECE2] text-[#203B35]">
+                <Eye className="h-3.5 w-3.5 text-[#203B35]" />
+              </div>
+              <div>
+                <span className="text-[13px] font-medium text-[#203B35]">
+                  Profile Perspective
+                </span>
+                <span className="hidden md:inline text-[12px] text-[#5D635F] ml-2">
+                  — Viewing as{" "}
+                  <strong className="font-medium text-[#203B35]">
+                    {perspective === "owner"
+                      ? "Owner (Full Studio Controls)"
+                      : "Public Visitor"}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Sample Profiles Quick Jump (for previewing multiple creators) */}
+              <div className="hidden lg:flex items-center gap-1.5 text-[11.5px] text-[#5D635F] border-r border-[#203B35]/10 pr-3 mr-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-[#92958F]">
+                  Switch:
+                </span>
+                {SAMPLE_PROFILE_LINKS.map((sample) => {
+                  const isCurrent =
+                    sample.username.toLowerCase() === profile.username.toLowerCase();
+                  return (
+                    <Link
+                      key={sample.username}
+                      href={`/profile/${sample.username}`}
+                      className={`rounded-full px-2 py-0.5 transition-colors ${
+                        isCurrent
+                          ? "bg-[#203B35] text-[#F6F3EB] font-medium"
+                          : "hover:bg-[#EFECE2] text-[#282B2A]/80 hover:text-[#203B35]"
+                      }`}
+                    >
+                      @{sample.username}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Owner View / Visitor View Switcher Group */}
+              <div
+                className="inline-flex items-center rounded-full border border-[#203B35]/15 bg-[#F6F3EB] p-1 self-start sm:self-auto"
+                role="group"
+                aria-label="Profile perspective view switcher"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPerspective("owner")}
+                  aria-pressed={perspective === "owner"}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+                    perspective === "owner"
+                      ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
+                      : "text-[#5D635F] hover:text-[#203B35]"
+                  }`}
+                >
+                  <PencilLine className="h-3 w-3" />
+                  <span>Owner View</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPerspective("visitor")}
+                  aria-pressed={perspective === "visitor"}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+                    perspective === "visitor"
+                      ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
+                      : "text-[#5D635F] hover:text-[#203B35]"
+                  }`}
+                >
+                  <Eye className="h-3 w-3" />
+                  <span>Visitor View</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Calm Local Preview Status Banner (when preview edits exist) */}
           <AnimatePresence>
             {(previewNotice || hasLocalEdits) && (
@@ -328,10 +408,10 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           />
         </main>
 
-        {/* Footer */}
+        {/* Profile Footer */}
         <ProfileFooter />
 
-        {/* Edit Profile Modal (Frontend-only state preview) */}
+        {/* Profile Interactive Modals */}
         <EditProfileModal
           isOpen={editModalOpen}
           profile={profile}
@@ -339,27 +419,24 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           onApplyChanges={handleApplyProfileEdits}
         />
 
-        {/* Followers / Following Directory Modal */}
         <SocialNetworkModal
-          isOpen={socialModalTab !== null}
-          initialTab={socialModalTab ?? "followers"}
+          isOpen={Boolean(socialModalTab)}
+          initialTab={socialModalTab || "followers"}
           displayName={profile.displayName}
           followers={profile.followersList}
           following={profile.followingList}
           onClose={() => setSocialModalTab(null)}
         />
 
-        {/* Project Detail & Process History Modal */}
         <ProjectPreviewModal
           project={selectedProject}
-          isLiked={selectedProject ? Boolean(likedProjectIds[selectedProject.id]) : false}
-          isSaved={selectedProject ? Boolean(savedProjectIds[selectedProject.id]) : false}
-          onClose={() => setSelectedProject(null)}
+          isLiked={Boolean(selectedProject && likedProjectIds[selectedProject.id])}
+          isSaved={Boolean(selectedProject && savedProjectIds[selectedProject.id])}
           onToggleLike={handleToggleProjectLike}
           onToggleSave={handleToggleProjectSave}
+          onClose={() => setSelectedProject(null)}
         />
 
-        {/* Service Details & Request Booking Preview Modal */}
         <ServiceDetailModal
           service={selectedService}
           providerName={profile.displayName}
@@ -368,7 +445,6 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           onClose={() => setSelectedService(null)}
         />
 
-        {/* Collaborate Invitation Preview Modal */}
         <CollaboratePreviewModal
           isOpen={collaborateOpen}
           recipientName={profile.displayName}

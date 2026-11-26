@@ -1,22 +1,25 @@
+import React, { Suspense } from "react";
 import type { Metadata } from "next";
-import { TemporaryPagePlaceholder } from "@/components/placeholder/TemporaryPagePlaceholder";
+import { ExploreClient } from "@/components/explore/ExploreClient";
 
 export const metadata: Metadata = {
-  title: "Explore — Discover Ideas & Creators | CreativeSpace",
+  title: "Explore — Discover Creators, Projects, Posts & Services | CreativeSpace",
   description:
-    "Discover ideas, meet creators, and find inspiration in every corner of creativity. Explore trending projects, independent practitioners, and curated collections.",
+    "Explore independent creators, curated projects, studio notes, and bespoke atelier services across creative disciplines on CreativeSpace.",
 };
 
-export default function Page() {
+interface ExplorePageProps {
+  searchParams?: {
+    q?: string;
+    category?: string;
+    discipline?: string;
+  };
+}
+
+export default function ExplorePage({ searchParams }: ExplorePageProps) {
   return (
-    <TemporaryPagePlaceholder
-      title="Explore"
-      routeLabel="/explore"
-      description="Old explore discovery gallery and mock dataset have been removed for upcoming redesign. Public discovery and search endpoints remain active."
-      contextItems={[
-        { label: "Extracted Logic", value: "src/lib/features/discover.ts" },
-        { label: "Backend APIs", value: "/api/discover, /api/search" },
-      ]}
-    />
+    <Suspense fallback={null}>
+      <ExploreClient initialSearchQuery={searchParams?.q} />
+    </Suspense>
   );
 }
