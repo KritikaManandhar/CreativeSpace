@@ -112,8 +112,8 @@ enum UploadIntentStatus {
 }
 
 enum UserRole {
-  CREATOR
-  VIEWER
+  USER
+  ADMIN
 }
 
 // === NEW BOOKING ENUMS (7) ===
@@ -187,7 +187,7 @@ model User {
   disciplines   Json          @default("[]")
   socialLinks   Json?
   socialPrivacy SocialPrivacy @default(Public)
-  role          UserRole      @default(CREATOR)
+  role          UserRole      @default(USER)
   timezone      String        @default("UTC")
   isAdmin       Boolean       @default(false)
   createdAt     DateTime      @default(now())

@@ -1,4 +1,4 @@
-import { PrismaClient, ProjectStatus, Visibility, CollaboratorRole, InvitationStatus, VersionStatus, NotificationType, ReportStatus, ReportTargetType } from "@prisma/client";
+import { PrismaClient, ProjectStatus, Visibility, CollaboratorRole, InvitationStatus, VersionStatus, NotificationType, ReportStatus, ReportTargetType, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -106,9 +106,10 @@ async function main() {
       passwordHash: defaultPasswordHash,
       bio: "Platform Administrator managing moderation, categories, and ecosystem health.",
       disciplines: ["Platform Admin"],
+      role: UserRole.ADMIN,
       isAdmin: true,
     },
-    update: { isAdmin: true },
+    update: { role: UserRole.ADMIN, isAdmin: true },
   });
 
   // 4. Ensure Portfolios exist for all creators

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { authorize } from "@/lib/rbac";
 import { UpdateProjectSchema } from "@/lib/validations/project";
@@ -189,7 +189,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       versions: visibleVersions,
       comments: visibleProjectComments,
       userRole: role,
-      canEdit: role === "Owner" || Boolean(user?.isAdmin),
+      canEdit: role === "Owner" || isAuthoritativeAdmin(user),
       hasLiked,
       isPortfolioFeatured: project.portfolioProjects.length > 0,
       tags: project.projectTags.map((pt) => pt.tag.name),

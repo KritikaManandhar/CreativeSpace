@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { authorize } from "@/lib/rbac";
 import {
@@ -171,7 +171,8 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
         role,
         scope: existing.versionId ? "version" : "project",
         version: existing.version,
-        isAdmin: Boolean(user.isAdmin),
+        userRole: user.role,
+        isAdmin: isAuthoritativeAdmin(user),
       });
 
       // Only the author (or platform admin) may delete a comment

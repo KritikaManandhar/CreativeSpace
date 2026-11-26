@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
+import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { RegisterSchema } from "@/lib/validations/auth";
 import { apiSuccess, apiError, handleApiError } from "@/lib/api-response";
@@ -31,7 +32,8 @@ export async function POST(req: NextRequest) {
     // Hash password with bcrypt
     const passwordHash = await bcrypt.hash(validatedData.password, 12);
 
-    // Create user and conditional portfolio inside a transaction
+    // Always assign unified USER role and isAdmin = false on public registration,
+    // and initialize a Portfolio for every registered user inside the transaction.
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -39,7 +41,8 @@ export async function POST(req: NextRequest) {
           username,
           passwordHash,
           displayName: validatedData.displayName.trim(),
-          role: validatedData.role,
+          role: UserRole.USER,
+          isAdmin: false,
           bio: validatedData.bio?.trim() || null,
           disciplines: validatedData.disciplines || [],
         },
@@ -57,15 +60,12 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Initialize empty portfolio only for Creators; Viewers do not have a portfolio
-      if (validatedData.role === "CREATOR") {
-        await tx.portfolio.create({
-          data: {
-            userId: user.id,
-            customSlug: user.username,
-          },
-        });
-      }
+      await tx.portfolio.create({
+        data: {
+          userId: user.id,
+          customSlug: user.username,
+        },
+      });
 
       return user;
     });

@@ -5,6 +5,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  isAuthoritativeAdmin as isAuthoritativeAdminRole,
+  resolveAuthoritativeRole as resolveAuthoritativeRoleValue,
+} from "@/lib/auth-role";
 
 const reactCache: <T extends (...args: any[]) => any>(fn: T) => T =
   typeof (React as any).cache === "function"
@@ -20,6 +24,18 @@ export interface AuthenticatedSessionUser {
   isAdmin: boolean;
   avatarUrl: string | null;
   disciplines: string[];
+}
+
+export function resolveAuthoritativeRole(
+  role: UserRole | string | null | undefined
+): UserRole {
+  return resolveAuthoritativeRoleValue(role) as UserRole;
+}
+
+export function isAuthoritativeAdmin(
+  user: { role?: UserRole | string | null } | null | undefined
+): boolean {
+  return isAuthoritativeAdminRole(user);
 }
 
 export type AccountEligibilityResult =
@@ -73,11 +89,14 @@ export function computeSessionSecurityStamp(dbUser: {
     Object.prototype.hasOwnProperty.call(dbUser, "emailVerified") &&
     dbUser.emailVerified !== undefined;
 
+  const authoritativeIsAdmin = dbUser.role === UserRole.ADMIN;
+
   const payload = [
     dbUser.id,
     dbUser.passwordHash ?? "",
     dbUser.email.toLowerCase().trim(),
     String(dbUser.role ?? ""),
+    authoritativeIsAdmin ? "A1" : "A0",
     dbUser.isAdmin ? "1" : "0",
     dbUser.tokenVersion !== undefined && dbUser.tokenVersion !== null
       ? String(dbUser.tokenVersion)
@@ -168,14 +187,16 @@ function toSafeSessionUser(dbUser: any): AuthenticatedSessionUser {
   const disciplines = Array.isArray(dbUser.disciplines)
     ? (dbUser.disciplines as string[])
     : [];
+  const role = resolveAuthoritativeRole(dbUser.role);
 
   return {
     id: dbUser.id,
     email: dbUser.email,
     username: dbUser.username,
     displayName: dbUser.displayName,
-    role: dbUser.role,
-    isAdmin: Boolean(dbUser.isAdmin),
+    role,
+    // Keep compatibility flag synchronized with authoritative role; isAdmin never independently grants access
+    isAdmin: role === UserRole.ADMIN,
     avatarUrl: dbUser.avatarUrl ?? null,
     disciplines,
   };
@@ -255,12 +276,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // Initial sign-in from verified authorize() output
       if (user) {
+        const authoritativeRole = resolveAuthoritativeRole(user.role);
         token.id = user.id;
         token.email = user.email;
         token.username = user.username;
         token.displayName = user.displayName;
-        token.role = user.role;
-        token.isAdmin = Boolean(user.isAdmin);
+        token.role = authoritativeRole;
+        token.isAdmin = authoritativeRole === UserRole.ADMIN;
         token.avatarUrl = user.avatarUrl ?? null;
         token.disciplines = Array.isArray(user.disciplines) ? user.disciplines : [];
         token.securityStamp = user.securityStamp;
@@ -300,12 +322,13 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (session.user) {
+        const authoritativeRole = resolveAuthoritativeRole(token.role);
         session.user.id = token.id as string;
         session.user.email = (token.email as string) || session.user.email;
         session.user.username = token.username as string;
         session.user.displayName = token.displayName as string;
-        session.user.role = token.role;
-        session.user.isAdmin = Boolean(token.isAdmin);
+        session.user.role = authoritativeRole;
+        session.user.isAdmin = authoritativeRole === UserRole.ADMIN;
         session.user.avatarUrl = (token.avatarUrl as string) || null;
         session.user.disciplines = (token.disciplines as string[]) || [];
       }

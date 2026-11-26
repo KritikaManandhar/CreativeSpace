@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { authorize } from "@/lib/rbac";
 import {
@@ -96,7 +96,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       role,
       scope: parsedQuery.scope,
       version,
-      isAdmin: Boolean(user?.isAdmin),
+      userRole: user?.role,
+      isAdmin: isAuthoritativeAdmin(user),
     });
 
     // 4. Query ONLY top-level comments for the requested scope, with 1-level replies & likes

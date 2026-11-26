@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DeleteAccountSchema } from "@/lib/validations/auth";
 import { apiSuccess, apiError, handleApiError } from "@/lib/api-response";
@@ -67,7 +67,7 @@ export async function GET() {
         username: user.username,
         displayName: user.displayName,
         role: user.role,
-        isAdmin: user.isAdmin,
+        isAdmin: isAuthoritativeAdmin(user),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         timezone: user.timezone,

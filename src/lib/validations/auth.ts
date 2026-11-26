@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SocialPrivacy, UserRole } from "@prisma/client";
+import { SocialPrivacy } from "@prisma/client";
 
 export const RegisterSchema = z.object({
   email: z.string().email("Please provide a valid email address"),
@@ -10,9 +10,6 @@ export const RegisterSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
   password: z.string().min(6, "Password must be at least 6 characters long"),
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
-  role: z.enum(["CREATOR", "VIEWER"], {
-    errorMap: () => ({ message: "Please select either Creator or Viewer as your role" }),
-  }),
   disciplines: z.array(z.string()).default([]),
   bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
 });

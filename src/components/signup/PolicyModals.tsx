@@ -12,6 +12,7 @@ export interface PolicyModalProps {
 
 export function PolicyModal({ isOpen, onClose, type }: PolicyModalProps) {
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -22,6 +23,7 @@ export function PolicyModal({ isOpen, onClose, type }: PolicyModalProps) {
     return () => {
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -56,7 +58,7 @@ export function PolicyModal({ isOpen, onClose, type }: PolicyModalProps) {
               )}
             </div>
             <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9DB5A5]">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5D635F]">
                 <CelestialSpark className="h-3 w-3 text-[#9DB5A5]" />
                 <span>CreativeSpace Governance</span>
               </div>
@@ -72,7 +74,7 @@ export function PolicyModal({ isOpen, onClose, type }: PolicyModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#92958F] hover:text-[#203B35] hover:bg-[#203B35]/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
+            className="rounded-full p-1.5 text-[#5D635F] hover:text-[#203B35] hover:bg-[#203B35]/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5" />

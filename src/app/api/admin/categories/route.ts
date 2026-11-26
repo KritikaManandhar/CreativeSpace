@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiSuccess, apiError, handleApiError } from "@/lib/api-response";
 import { z } from "zod";
@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !user.isAdmin) {
+    if (!user || !isAuthoritativeAdmin(user)) {
       return apiError("FORBIDDEN", "Administrative privileges required", 403);
     }
 

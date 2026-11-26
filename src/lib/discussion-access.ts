@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/api-response";
 import { AuthUser } from "@/lib/rbac";
-import { CollaboratorRole, VersionStatus, Visibility } from "@prisma/client";
+import { CollaboratorRole, UserRole, VersionStatus, Visibility } from "@prisma/client";
 import type { CommentScope } from "@/lib/validations/comment";
 
 export interface DiscussionProjectContext {
@@ -43,13 +43,15 @@ export function assertCanViewDiscussionScope(params: {
   role: CollaboratorRole | "None";
   scope: CommentScope;
   version?: DiscussionVersionContext | null;
+  userRole?: UserRole | string | null;
   isAdmin?: boolean;
 }): void {
-  const { project, role, scope, version, isAdmin } = params;
+  const { project, role, scope, version, userRole, isAdmin } = params;
   const isMember = isProjectMemberRole(role);
+  const actorIsAdmin = userRole === UserRole.ADMIN && isAdmin !== false;
 
   if (scope === "project") {
-    if (!isMember && !isAdmin) {
+    if (!isMember && !actorIsAdmin) {
       throw new AppError(
         "FORBIDDEN",
         "Project discussions are restricted to authorized project members",
@@ -64,7 +66,7 @@ export function assertCanViewDiscussionScope(params: {
     throw new AppError("NOT_FOUND", "Specified version not found on this project", 404);
   }
 
-  if (isMember || isAdmin) {
+  if (isMember || actorIsAdmin) {
     return;
   }
 
@@ -131,7 +133,7 @@ export function assertCanDeleteComment(
   if (!user?.id) {
     throw new AppError("UNAUTHORIZED", "Authentication required", 401);
   }
-  if (commentAuthorId !== user.id && !user.isAdmin) {
+  if (commentAuthorId !== user.id && user.role !== UserRole.ADMIN) {
     throw new AppError(
       "FORBIDDEN",
       "You can only delete your own comments",

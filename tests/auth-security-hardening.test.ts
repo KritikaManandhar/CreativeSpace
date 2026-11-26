@@ -92,7 +92,7 @@ async function runSuite() {
       username: "owner_creator",
       displayName: "Owner Creator",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: ["Illustration"],
@@ -106,7 +106,7 @@ async function runSuite() {
       username: "collab_a",
       displayName: "Collab A",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: ["Music"],
@@ -120,7 +120,7 @@ async function runSuite() {
       username: "collab_b",
       displayName: "Collab B",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: ["Animation"],
@@ -134,7 +134,7 @@ async function runSuite() {
       username: "client_reviewer",
       displayName: "Legacy Reviewer",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: ["Client Reviewer"],
@@ -148,7 +148,7 @@ async function runSuite() {
       username: "outsider_user",
       displayName: "Outsider",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: [],
@@ -162,7 +162,7 @@ async function runSuite() {
       username: "unverified_user",
       displayName: "Unverified User",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: [],
@@ -176,7 +176,7 @@ async function runSuite() {
       username: "suspended_user",
       displayName: "Suspended User",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.ADMIN,
       isAdmin: true,
       avatarUrl: null,
       disciplines: [],
@@ -190,7 +190,7 @@ async function runSuite() {
       username: "admin_user",
       displayName: "Platform Admin",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.ADMIN,
       isAdmin: true,
       avatarUrl: null,
       disciplines: [],
@@ -204,7 +204,7 @@ async function runSuite() {
       username: "legacy_schema_user",
       displayName: "Pre-Migration Schema User",
       passwordHash,
-      role: UserRole.CREATOR,
+      role: UserRole.USER,
       isAdmin: false,
       avatarUrl: null,
       disciplines: ["Photography"],
@@ -609,10 +609,17 @@ async function runSuite() {
       const catRes = await createAdminCategory(makeReq("POST", { name: "Sculpture" }));
       assert(catRes.status === 403, `Non-admin POST /api/admin/categories must return 403, got ${catRes.status}`);
 
+      // Legacy compatibility flag isAdmin=true with role=USER must NOT independently grant admin access
+      currentMockSessionUser = { ...mockUsers["owner-1"], role: UserRole.USER, isAdmin: true };
+      const desyncedPageRes = await evaluateAdminPageAccess("/admin");
+      assert(!desyncedPageRes.allowed && desyncedPageRes.status === 403, "USER with isAdmin=true must still receive 403 from evaluateAdminPageAccess");
+      const desyncedStatsRes = await getAdminStats(makeReq("GET"));
+      assert(desyncedStatsRes.status === 403, `USER with isAdmin=true /api/admin/stats must return 403, got ${desyncedStatsRes.status}`);
+
       // Legitimate verified active admin succeeds
       currentMockSessionUser = mockUsers["admin-1"];
       const adminPageOk = await evaluateAdminPageAccess("/admin");
-      assert(adminPageOk.allowed && adminPageOk.user.isAdmin, "Active verified admin must access /admin");
+      assert(adminPageOk.allowed && adminPageOk.user.role === UserRole.ADMIN && adminPageOk.user.isAdmin, "Active verified admin must access /admin");
       const adminStatsOk = await getAdminStats(makeReq("GET"));
       assert(adminStatsOk.status === 200, `Verified admin stats must return 200, got ${adminStatsOk.status}`);
     });
@@ -636,7 +643,7 @@ async function runSuite() {
           user: {
             id: mockUsers["admin-1"].id,
             isAdmin: true,
-            role: UserRole.CREATOR,
+            role: UserRole.ADMIN,
             displayName: "Forged Admin",
           },
         } as any,

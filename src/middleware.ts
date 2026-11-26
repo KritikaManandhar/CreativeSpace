@@ -1,4 +1,5 @@
 import { withAuth } from "next-auth/middleware";
+import { isMiddlewareTokenAuthorized } from "@/lib/auth-role";
 
 export default withAuth({
   pages: {
@@ -7,20 +8,7 @@ export default withAuth({
   },
   callbacks: {
     authorized({ req, token }) {
-      if (
-        !token?.id ||
-        typeof token.securityStamp !== "string" ||
-        token.securityStamp.length === 0 ||
-        token.sessionInvalid
-      ) {
-        return false;
-      }
-
-      if (req.nextUrl.pathname.startsWith("/admin")) {
-        return Boolean(token.isAdmin);
-      }
-
-      return true;
+      return isMiddlewareTokenAuthorized(req.nextUrl.pathname, token);
     },
   },
 });

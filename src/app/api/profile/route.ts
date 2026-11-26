@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ProfileUpdateSchema } from "@/lib/validations/auth";
 import { apiSuccess, apiError, handleApiError } from "@/lib/api-response";
@@ -45,7 +45,10 @@ export async function GET() {
       return apiError("NOT_FOUND", "User profile not found", 404);
     }
 
-    return apiSuccess(user);
+    return apiSuccess({
+      ...user,
+      isAdmin: isAuthoritativeAdmin(user),
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -110,7 +113,10 @@ export async function PATCH(req: NextRequest) {
     });
 
     return apiSuccess({
-      user: updatedUser,
+      user: {
+        ...updatedUser,
+        isAdmin: isAuthoritativeAdmin(updatedUser),
+      },
       message: "Profile updated successfully",
     });
   } catch (error) {

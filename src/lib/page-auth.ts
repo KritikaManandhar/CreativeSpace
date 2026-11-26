@@ -46,7 +46,7 @@ export async function evaluateAdminPageAccess(
     };
   }
 
-  if (!user.isAdmin) {
+  if (!authModule.isAuthoritativeAdmin(user)) {
     return {
       allowed: false,
       status: 403,

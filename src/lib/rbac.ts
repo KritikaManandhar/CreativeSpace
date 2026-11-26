@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api-response";
-import { CollaboratorRole, InvitationStatus, Visibility } from "@prisma/client";
+import { CollaboratorRole, InvitationStatus, UserRole, Visibility } from "@prisma/client";
 
 export type ProjectAction =
   | "view_project"
@@ -21,6 +21,7 @@ export interface AuthUser {
   id: string;
   email?: string | null;
   username?: string | null;
+  role?: UserRole | string | null;
   isAdmin?: boolean;
   emailVerified?: Date | string | boolean | null;
   suspendedAt?: Date | string | null;
@@ -112,10 +113,11 @@ export async function authorize(
   action: ProjectAction
 ): Promise<AuthorizationResult> {
   const activeUser = isEligibleAuthUser(user) ? user : null;
+  const actorIsAdmin = activeUser?.role === UserRole.ADMIN;
   const { role, project } = await getEffectiveRole(activeUser?.id, projectId);
 
   // Platform Admin override for viewing and moderation
-  if (activeUser?.isAdmin && action === "view_project") {
+  if (actorIsAdmin && action === "view_project") {
     return { authorized: true, role, project };
   }
 
@@ -142,7 +144,7 @@ export async function authorize(
   // Role permissions per PRD Section 18 & TRD Section 13
   switch (action) {
     case "manage_settings":
-      if (role !== "Owner" && !activeUser.isAdmin) {
+      if (role !== "Owner" && !actorIsAdmin) {
         throw new AppError(
           "FORBIDDEN",
           `Only the project owner or authorized administrator can perform this action: ${action}`,
@@ -157,7 +159,7 @@ export async function authorize(
     case "publish_portfolio":
     case "designate_final_version":
     case "delete_version":
-      if (role !== "Owner" && !activeUser.isAdmin) {
+      if (role !== "Owner" && !actorIsAdmin) {
         throw new AppError(
           "FORBIDDEN",
           `Only the project owner can perform this action: ${action}`,

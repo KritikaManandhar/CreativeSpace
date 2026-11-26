@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAuthoritativeAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiSuccess, apiError, handleApiError } from "@/lib/api-response";
 import {
@@ -171,11 +171,12 @@ export async function GET(req: NextRequest) {
         const isPendingInviteeForInviteNotif =
           n.type === NotificationType.Invitation && memberPending;
 
+        const actorIsAdmin = isAuthoritativeAdmin(user);
         canSeeProject =
           proj.visibility === Visibility.Public ||
           isAcceptedMember ||
           isPendingInviteeForInviteNotif ||
-          Boolean(user.isAdmin);
+          actorIsAdmin;
       }
 
       const safeProject =
@@ -197,7 +198,7 @@ export async function GET(req: NextRequest) {
       ) {
         const versionVisible =
           isAcceptedMember ||
-          Boolean(user.isAdmin) ||
+          isAuthoritativeAdmin(user) ||
           n.relatedVersion.status !== VersionStatus.Rejected;
         if (versionVisible) {
           safeVersion = {
@@ -218,7 +219,7 @@ export async function GET(req: NextRequest) {
         const isProjectDiscussion = n.relatedComment.versionId === null;
         const commentVisible =
           isAcceptedMember ||
-          Boolean(user.isAdmin) ||
+          isAuthoritativeAdmin(user) ||
           (!isProjectDiscussion &&
             (!n.relatedVersion || n.relatedVersion.status !== VersionStatus.Rejected));
         if (commentVisible) {

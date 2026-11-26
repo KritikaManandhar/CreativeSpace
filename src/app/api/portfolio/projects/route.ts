@@ -14,10 +14,6 @@ export async function POST(req: NextRequest) {
       return apiError("UNAUTHORIZED", "Authentication required", 401);
     }
 
-    if (user.role !== "CREATOR" && !user.isAdmin) {
-      return apiError("FORBIDDEN", "Only creators can showcase projects in a portfolio", 403);
-    }
-
     const body = await req.json();
     const { projectId, featured, displayOrder } = AddPortfolioProjectSchema.parse(body);
 
