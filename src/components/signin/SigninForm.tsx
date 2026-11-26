@@ -1,50 +1,95 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn, useSession } from "next-auth/react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Eye,
-  EyeOff,
-  Mail,
-  Lock,
   AlertCircle,
-  Loader2,
-  Sparkles,
   ArrowRight,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import { CelestialSpark } from "@/components/landing/CreativeSpaceBrand";
+import {
+  LoginFieldErrors,
+  LoginFieldKey,
+  mapAuthErrorMessage,
+  resolvePostLoginDestination,
+  resolveSafeCallbackUrl,
+  validateLoginValues,
+} from "@/lib/login-utils";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
 
 const REMEMBERED_EMAIL_KEY = "creativespace_remembered_email";
 
+function InlineFieldError({ id, message }: { id: string; message?: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.p
+          id={id}
+          role="status"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+          className="text-[12px] leading-snug text-[#9F311D]"
+        >
+          {message}
+        </motion.p>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function SigninForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const { data: session, status } = useSession();
+
+  const rawCallbackUrl = searchParams.get("callbackUrl");
+  const rawQueryError = searchParams.get("error");
   const justRegistered = searchParams.get("registered") === "true";
 
-  // Form states
+  // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
-  // UI states
+  // Validation & UI state
+  const [mounted, setMounted] = useState(false);
+  const [origin, setOrigin] = useState<string | undefined>(undefined);
+  const [touched, setTouched] = useState<Partial<Record<LoginFieldKey, boolean>>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [dismissedQueryError, setDismissedQueryError] = useState(false);
   const [successEntering, setSuccessEntering] = useState(false);
+  const [portalDestination, setPortalDestination] = useState<string>("/dashboard");
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  // Unique accessible IDs
+  // Refs for focus management on invalid submit
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  // Accessible IDs
   const emailId = useId();
+  const emailErrId = useId();
   const passwordId = useId();
+  const passwordErrId = useId();
   const rememberMeId = useId();
 
-  // Load remembered email on mount
   useEffect(() => {
+    setMounted(true);
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
     try {
       const savedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
       if (savedEmail) {
@@ -52,30 +97,73 @@ export function SigninForm() {
         setRememberMe(true);
       }
     } catch {
-      // LocalStorage access might fail in restricted iframe environments
+      // LocalStorage access may be blocked in restricted contexts
     }
   }, []);
 
+  useEffect(() => {
+    setDismissedQueryError(false);
+  }, [rawQueryError]);
+
+  const allErrors = validateLoginValues({ email, password });
+  const visibleErrors: LoginFieldErrors = {
+    email: touched.email || hasSubmitted ? allErrors.email : undefined,
+    password: touched.password || hasSubmitted ? allErrors.password : undefined,
+  };
+
+  const queryErrorMessage = !dismissedQueryError
+    ? mapAuthErrorMessage(rawQueryError, { fromQueryParam: true })
+    : null;
+  const displayError = serverError || queryErrorMessage;
+
+  const safeCallback = mounted ? resolveSafeCallbackUrl(rawCallbackUrl, origin) : null;
+  const isAdminBounceForStandardUser = Boolean(
+    mounted &&
+      status === "authenticated" &&
+      session?.user?.id &&
+      session.user.role !== "ADMIN" &&
+      safeCallback &&
+      (safeCallback === "/admin" || safeCallback.startsWith("/admin/"))
+  );
+  const continueHref =
+    mounted && session?.user?.id
+      ? resolvePostLoginDestination({
+          rawCallbackUrl,
+          currentOrigin: origin,
+          userRole: session.user.role,
+        })
+      : "/dashboard";
+
+  const markTouched = (field: LoginFieldKey) => {
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  };
+
+  const clearSubmissionErrors = () => {
+    if (serverError) setServerError(null);
+    if (!dismissedQueryError && rawQueryError) setDismissedQueryError(true);
+  };
+
+  const focusFirstInvalidField = (errors: LoginFieldErrors) => {
+    if (errors.email) emailInputRef.current?.focus();
+    else if (errors.password) passwordInputRef.current?.focus();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
+    setServerError(null);
+    setDismissedQueryError(true);
+    setHasSubmitted(true);
+
+    const validationErrors = validateLoginValues({ email, password });
+    if (Object.keys(validationErrors).length > 0) {
+      focusFirstInvalidField(validationErrors);
+      return;
+    }
 
     const trimmedEmail = email.trim().toLowerCase();
-
-    if (!trimmedEmail || !trimmedEmail.includes("@")) {
-      setErrorMessage("Please enter a valid email address.");
-      return;
-    }
-
-    if (!password) {
-      setErrorMessage("Please enter your password.");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      // Manage Remember Me preference
       try {
         if (rememberMe) {
           localStorage.setItem(REMEMBERED_EMAIL_KEY, trimmedEmail);
@@ -83,182 +171,282 @@ export function SigninForm() {
           localStorage.removeItem(REMEMBERED_EMAIL_KEY);
         }
       } catch {
-        // Ignore localStorage error
+        // Ignore storage errors
       }
 
-      // NextAuth Credentials sign-in
       const res = await signIn("credentials", {
         redirect: false,
         email: trimmedEmail,
         password,
       });
 
-      if (res?.error) {
-        // Refine message to be polite and descriptive
-        if (res.error.toLowerCase().includes("invalid")) {
-          setErrorMessage("Invalid email or password. Please verify your credentials and try again.");
-        } else {
-          setErrorMessage(res.error);
-        }
+      if (!res || res.error || res.ok === false) {
+        setServerError(
+          mapAuthErrorMessage(res?.error || "CredentialsSignin") ||
+            "Invalid email or password. Please check your credentials and try again."
+        );
         setIsLoading(false);
         return;
       }
 
-      // Successfully authenticated -> display cosmic portal entry transition
+      // Inspect verified session role (USER vs ADMIN) for safe post-login routing
+      const updatedSession = await getSession().catch(() => null);
+      const currentOrigin =
+        typeof window !== "undefined" ? window.location.origin : origin;
+      const destination = resolvePostLoginDestination({
+        rawCallbackUrl,
+        currentOrigin,
+        userRole: updatedSession?.user?.role,
+      });
+
+      setPortalDestination(destination);
       setSuccessEntering(true);
 
-      // Smooth redirection to requested callbackUrl or creator dashboard
-      router.push(callbackUrl);
+      router.push(destination);
       router.refresh();
-    } catch (err: any) {
-      setErrorMessage("An unexpected error occurred during sign in. Please try again.");
+    } catch {
+      setServerError(
+        "Unable to sign in right now. Please check your connection and try again."
+      );
       setIsLoading(false);
       setSuccessEntering(false);
     }
   };
 
+  const isEnteringAdmin =
+    portalDestination === "/admin" || portalDestination.startsWith("/admin/");
+
   return (
     <>
-      <div className="relative w-full max-w-[500px] rounded-3xl bg-[#FAF8F3] p-7 sm:p-9 border border-[#203B35]/12 shadow-[0_24px_64px_-16px_rgba(32,59,53,0.08),0_2px_6px_rgba(32,59,53,0.03)] text-[#282B2A] transition-all">
-        {/* Subtle decorative inner corner glint */}
-        <div className="pointer-events-none absolute top-4 right-4 opacity-40">
-          <CelestialSpark className="h-4 w-4 text-[#9DB5A5]" />
+      <div className="relative w-full max-w-[492px] rounded-[22px] bg-[#FAF8F3] p-6 sm:p-8 border border-[#203B35]/12 shadow-[0_24px_60px_-24px_rgba(32,59,53,0.16),0_2px_8px_rgba(32,59,53,0.04)] text-[#282B2A]">
+        {/* Restrained corner celestial detail */}
+        <div className="pointer-events-none absolute top-4 right-4 opacity-50" aria-hidden="true">
+          <CelestialSpark className="h-3.5 w-3.5 text-[#9DB5A5]" />
         </div>
 
-        {/* Success / Entering State Overlay */}
         {successEntering ? (
           <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 animate-fade-up">
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#203B35] text-[#F6F3EB] shadow-lg shadow-[#203B35]/20 animate-pulse-soft">
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#203B35] text-[#F6F3EB] shadow-lg shadow-[#203B35]/20">
               <Sparkles className="h-7 w-7 text-[#C8BDE0]" />
               <div className="absolute inset-0 rounded-full border-2 border-[#9DB5A5] animate-ping opacity-25" />
             </div>
             <div className="space-y-1.5">
-              <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#9DB5A5]">
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#5D635F]">
                 Cosmic Portal Open
               </p>
-              <h3 className="font-serif text-2xl sm:text-3xl font-normal text-[#203B35]">
+              <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#203B35]">
                 Welcome Back, Dreamer!
-              </h3>
-              <p className="text-sm text-[#282B2A]/70 max-w-xs">
-                Resuming your studio drafts, collaborations, and workspace...
+              </h2>
+              <p className="text-sm text-[#282B2A]/75 max-w-xs">
+                {isEnteringAdmin
+                  ? "Opening your administrative moderation and platform console..."
+                  : "Resuming your studio drafts, portfolio works, and collaborations..."}
               </p>
             </div>
-            <div className="flex items-center gap-2 pt-2 text-xs text-[#92958F] font-mono">
+            <div className="flex items-center gap-2 pt-2 font-mono text-xs text-[#5D635F]">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[#203B35]" />
-              <span>Entering studio workspace</span>
+              <span>{isEnteringAdmin ? "Entering admin console" : "Entering studio workspace"}</span>
             </div>
           </div>
         ) : (
           <div>
             {/* Form Header */}
-            <div className="space-y-1.5 pb-6">
-              <h2 className="font-serif text-[26px] sm:text-[30px] font-normal leading-tight text-[#203B35] tracking-tight">
+            <div className="space-y-1.5 pb-5 border-b border-[#203B35]/10">
+              <h2 className="font-serif text-[28px] sm:text-[32px] font-normal leading-[1.1] text-[#203B35] tracking-[-0.02em]">
                 Sign in to CreativeSpace
               </h2>
-              <p className="text-[14px] leading-relaxed text-[#282B2A]/70">
-                Welcome back. Enter your credentials to access your studio.
+              <p className="text-[14px] leading-relaxed text-[#282B2A]/75">
+                Welcome back. Enter your credentials to open your studio.
               </p>
             </div>
 
+            {/* Active Session Notice (helpful if navigating directly or bounced from /admin) */}
+            {mounted &&
+              status === "authenticated" &&
+              session?.user?.id &&
+              !isLoading && (
+                <div
+                  role="status"
+                  className="mt-4 flex flex-col gap-2 rounded-xl border border-[#9DB5A5]/55 bg-[#F6F3EB] p-3.5 text-[13px] text-[#203B35]"
+                >
+                  <p className="leading-snug">
+                    {isAdminBounceForStandardUser ? (
+                      <>
+                        Signed in as{" "}
+                        <span className="font-semibold">@{session.user.username}</span>.
+                        That area requires administrator permissions.
+                      </>
+                    ) : (
+                      <>
+                        You are already signed in as{" "}
+                        <span className="font-semibold">
+                          {session.user.displayName || `@${session.user.username}`}
+                        </span>
+                        .
+                      </>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                      href={continueHref}
+                      className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#203B35] underline underline-offset-4 decoration-[#9DB5A5] hover:decoration-[#203B35] transition-colors"
+                    >
+                      <span>
+                        {continueHref.startsWith("/admin")
+                          ? "Continue to Admin Console"
+                          : "Continue to Dashboard"}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
             {/* Just Registered Welcoming Banner */}
-            {justRegistered && !errorMessage && (
-              <div
-                role="status"
-                className="mb-5 flex items-start gap-2.5 rounded-xl border border-[#9DB5A5]/60 bg-[#9DB5A5]/15 p-3.5 text-[13px] text-[#203B35] animate-fade-up"
-              >
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-[#203B35] mt-0.5" />
-                <span className="leading-snug">
-                  Your creative account has been created! Sign in to enter your studio.
-                </span>
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {justRegistered && !displayError && (
+                <motion.div
+                  role="status"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#9DB5A5]/60 bg-[#9DB5A5]/15 p-3.5 text-[13px] text-[#203B35]"
+                >
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#203B35] mt-0.5" />
+                  <span className="leading-snug">
+                    Your creative account has been created! Sign in to enter your studio.
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Error Message Banner */}
-            {errorMessage && (
-              <div
-                role="alert"
-                className="mb-5 flex items-start gap-2.5 rounded-xl border border-rose-300/80 bg-rose-50/80 p-3.5 text-[13px] text-rose-900 animate-fade-up"
-              >
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-700 mt-0.5" />
-                <span className="leading-snug">{errorMessage}</span>
-              </div>
-            )}
+            {/* Authentication / Server Error Banner */}
+            <AnimatePresence initial={false}>
+              {displayError && (
+                <motion.div
+                  role="alert"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#D98272]/70 bg-[#FDF4F2] p-3.5 text-[13px] text-[#8B2B19]"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 text-[#B8422C] mt-0.5" />
+                  <span className="leading-snug">{displayError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Main Form */}
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              {/* 1. Email Address Field */}
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
+              {/* 1. Email Address */}
               <div className="space-y-1.5">
                 <label
                   htmlFor={emailId}
-                  className="block text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#203B35]"
+                  className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#203B35]"
                 >
                   Email Address
                 </label>
-                <div className="relative">
-                  <input
-                    id={emailId}
-                    type="email"
-                    required
-                    autoComplete="email"
-                    placeholder="Enter your email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                    className="w-full h-11 sm:h-12 rounded-xl bg-[#F6F3EB]/70 border border-[#203B35]/15 pl-10 pr-3.5 text-[14.5px] text-[#282B2A] placeholder:text-[#92958F] transition-all duration-200 focus:bg-white focus:outline-none focus:border-[#9DB5A5] focus:ring-2 focus:ring-[#9DB5A5]/40 disabled:opacity-50"
-                  />
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#92958F] pointer-events-none" />
-                </div>
+                <input
+                  ref={emailInputRef}
+                  id={emailId}
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearSubmissionErrors();
+                  }}
+                  onBlur={() => markTouched("email")}
+                  disabled={isLoading}
+                  aria-invalid={Boolean(visibleErrors.email)}
+                  aria-describedby={visibleErrors.email ? emailErrId : undefined}
+                  className={`w-full h-11 sm:h-12 rounded-xl bg-[#F6F3EB]/75 border px-3.5 text-[14.5px] text-[#282B2A] placeholder:text-[#5D635F]/75 transition-all duration-200 focus:bg-[#FAF8F3] focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                    visibleErrors.email
+                      ? "border-[#B8422C]/70 focus:border-[#B8422C] focus:ring-[#B8422C]/20"
+                      : "border-[#203B35]/15 focus:border-[#203B35]/55 focus:ring-[#9DB5A5]/45"
+                  }`}
+                />
+                <InlineFieldError id={emailErrId} message={visibleErrors.email} />
               </div>
 
-              {/* 2. Password Field */}
+              {/* 2. Password */}
               <div className="space-y-1.5">
                 <label
                   htmlFor={passwordId}
-                  className="block text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#203B35]"
+                  className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#203B35]"
                 >
                   Password
                 </label>
                 <div className="relative">
                   <input
+                    ref={passwordInputRef}
                     id={passwordId}
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     required
                     autoComplete="current-password"
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      clearSubmissionErrors();
+                    }}
+                    onBlur={() => markTouched("password")}
                     disabled={isLoading}
-                    className="w-full h-11 sm:h-12 rounded-xl bg-[#F6F3EB]/70 border border-[#203B35]/15 pl-10 pr-11 text-[14.5px] text-[#282B2A] placeholder:text-[#92958F] transition-all duration-200 focus:bg-white focus:outline-none focus:border-[#9DB5A5] focus:ring-2 focus:ring-[#9DB5A5]/40 disabled:opacity-50"
+                    aria-invalid={Boolean(visibleErrors.password)}
+                    aria-describedby={visibleErrors.password ? passwordErrId : undefined}
+                    className={`w-full h-11 sm:h-12 rounded-xl bg-[#F6F3EB]/75 border px-3.5 pr-11 text-[14.5px] text-[#282B2A] placeholder:text-[#5D635F]/75 transition-all duration-200 focus:bg-[#FAF8F3] focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                      visibleErrors.password
+                        ? "border-[#B8422C]/70 focus:border-[#B8422C] focus:ring-[#B8422C]/20"
+                        : "border-[#203B35]/15 focus:border-[#203B35]/55 focus:ring-[#9DB5A5]/45"
+                    }`}
                   />
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#92958F] pointer-events-none" />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#92958F] hover:text-[#203B35] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/30 rounded-md"
+                    disabled={isLoading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#5D635F] hover:text-[#203B35] hover:bg-[#203B35]/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 disabled:opacity-50"
                     aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4.5 w-4.5" />
+                      <EyeOff className="h-[18px] w-[18px]" />
                     ) : (
-                      <Eye className="h-4.5 w-4.5" />
+                      <Eye className="h-[18px] w-[18px]" />
                     )}
                   </button>
                 </div>
+                <InlineFieldError id={passwordErrId} message={visibleErrors.password} />
               </div>
 
-              {/* 3. Understated Remember Me & Forgot Password Row */}
-              <div className="flex items-center justify-between pt-1 select-none">
+              {/* 3. Remember Me & Forgot Password */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 select-none">
                 <label
                   htmlFor={rememberMeId}
-                  className="flex items-center gap-2.5 cursor-pointer text-[13px] text-[#282B2A]/80 hover:text-[#203B35] transition-colors"
+                  className="flex items-center gap-2.5 cursor-pointer text-[13px] text-[#282B2A]/85 hover:text-[#203B35] transition-colors"
                 >
                   <input
                     id={rememberMeId}
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setRememberMe(next);
+                      if (!next) {
+                        try {
+                          localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+                        } catch {
+                          // Ignore storage errors
+                        }
+                      }
+                    }}
                     disabled={isLoading}
-                    className="h-4 w-4 shrink-0 rounded border-[#203B35]/25 text-[#203B35] focus:ring-2 focus:ring-[#9DB5A5] focus:ring-offset-1 focus:ring-offset-[#FAF8F3] accent-[#203B35] cursor-pointer"
+                    className="h-4 w-4 shrink-0 rounded border-[#203B35]/30 text-[#203B35] focus:ring-2 focus:ring-[#9DB5A5] focus:ring-offset-1 focus:ring-offset-[#FAF8F3] accent-[#203B35] cursor-pointer disabled:opacity-50"
                   />
                   <span>Remember me</span>
                 </label>
@@ -266,18 +454,20 @@ export function SigninForm() {
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(true)}
-                  className="text-[13px] font-medium text-[#203B35] underline underline-offset-2 decoration-[#9DB5A5]/70 hover:decoration-[#203B35] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/30 rounded"
+                  disabled={isLoading}
+                  className="text-[13px] font-medium text-[#203B35] underline underline-offset-2 decoration-[#9DB5A5]/80 hover:decoration-[#203B35] transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 disabled:opacity-50"
                 >
                   Forgot password?
                 </button>
               </div>
 
-              {/* 4. Primary CTA: "Enter CreativeSpace" */}
-              <div className="pt-3">
+              {/* 4. Primary CTA */}
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#203B35] px-6 text-[15px] font-medium text-[#F6F3EB] transition-all duration-200 hover:bg-[#162A26] active:scale-[0.99] disabled:opacity-60 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAF8F3]"
+                  aria-busy={isLoading}
+                  className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#203B35] px-6 text-[14.5px] font-medium text-[#F6F3EB] transition-all duration-200 hover:bg-[#162A26] active:scale-[0.99] disabled:opacity-60 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAF8F3]"
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
@@ -294,12 +484,12 @@ export function SigninForm() {
               </div>
 
               {/* 5. Bottom Navigation */}
-              <div className="pt-3 text-center">
-                <p className="text-[13px] text-[#282B2A]/70">
+              <div className="pt-2 text-center">
+                <p className="text-[13px] text-[#5D635F]">
                   New to CreativeSpace?{" "}
                   <Link
                     href="/register"
-                    className="font-medium text-[#203B35] hover:text-[#162A26] underline underline-offset-4 decoration-[#9DB5A5] hover:decoration-[#203B35] transition-colors"
+                    className="font-medium text-[#203B35] hover:text-[#162A26] underline underline-offset-4 decoration-[#9DB5A5]/80 hover:decoration-[#203B35] transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
                   >
                     Create an account
                   </Link>

@@ -9,6 +9,7 @@ import {
   isAuthoritativeAdmin as isAuthoritativeAdminRole,
   resolveAuthoritativeRole as resolveAuthoritativeRoleValue,
 } from "@/lib/auth-role";
+import { LoginSchema } from "@/lib/validations/auth";
 
 const reactCache: <T extends (...args: any[]) => any>(fn: T) => T =
   typeof (React as any).cache === "function"
@@ -240,21 +241,49 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.email && !credentials?.password) {
           throw new Error("Email and password are required");
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email.toLowerCase().trim(),
-          },
+        const parsed = LoginSchema.safeParse({
+          email:
+            typeof credentials?.email === "string"
+              ? credentials.email.toLowerCase().trim()
+              : "",
+          password:
+            typeof credentials?.password === "string" ? credentials.password : "",
         });
+
+        if (!parsed.success) {
+          throw new Error(
+            parsed.error.issues[0]?.message || "Email and password are required"
+          );
+        }
+
+        let user: any;
+        try {
+          user = await prisma.user.findUnique({
+            where: {
+              email: parsed.data.email,
+            },
+          });
+        } catch (err) {
+          console.error("Credentials authorization database error:", err);
+          throw new Error(
+            "Authentication service temporarily unavailable. Please try again shortly."
+          );
+        }
 
         if (!user || !user.passwordHash) {
           throw new Error("Invalid email or password");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+        let isValid = false;
+        try {
+          isValid = await bcrypt.compare(parsed.data.password, user.passwordHash);
+        } catch {
+          isValid = false;
+        }
         if (!isValid) {
           throw new Error("Invalid email or password");
         }
