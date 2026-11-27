@@ -184,13 +184,34 @@ export function MyProjectsSection({
                     <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#FAF8F3] bg-black/50 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/15">
                       {project.discipline}
                     </span>
-                    <div className="shrink-0">{renderStatusBadge(project.status)}</div>
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      {project.isPublished === false ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-400/50 bg-stone-900/80 backdrop-blur-sm px-2.5 py-0.5 text-[11px] font-medium text-amber-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          Draft
+                        </span>
+                      ) : (
+                        renderStatusBadge(project.status)
+                      )}
+                    </div>
                   </div>
 
-                  {/* Bottom overlay: Version tag */}
-                  <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5 text-[11px] font-mono text-[#FAF8F3] bg-black/45 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/15">
-                    <GitBranch className="h-3 w-3 text-[#9DB5A5]" />
-                    <span>{project.versionTag}</span>
+                  {/* Bottom overlay: Version tag & Publication badge */}
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-1 text-[11px] font-mono text-[#FAF8F3]">
+                    <div className="flex items-center gap-1.5 bg-black/45 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/15">
+                      <GitBranch className="h-3 w-3 text-[#9DB5A5]" />
+                      <span>{project.versionTag}</span>
+                    </div>
+
+                    {project.isPublished === false ? (
+                      <span className="text-[10px] text-amber-200/90 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10">
+                        Hidden from Profile
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#9DB5A5] bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10">
+                        Public Profile
+                      </span>
+                    )}
                   </div>
                 </div>
 

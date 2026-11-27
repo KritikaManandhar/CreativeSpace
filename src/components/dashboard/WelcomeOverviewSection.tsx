@@ -3,25 +3,13 @@
 import React, { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  ArrowUpRight,
-  Briefcase,
-  Calendar,
-  Eye,
-  GitBranch,
-  Heart,
-  Layers,
-  Lightbulb,
-  Palette,
-  Settings,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { ArrowUpRight, Settings } from "lucide-react";
 import { CelestialSpark } from "@/components/landing/CreativeSpaceBrand";
 import type {
   DashboardBookingItem,
   DashboardIdeaItem,
 } from "@/data/mockDashboard";
+import type { UnifiedBookingItem } from "@/lib/bookingStore";
 import type {
   ProfileProjectItem,
   ProfileServiceItem,
@@ -36,22 +24,17 @@ interface WelcomeOverviewSectionProps {
     headline?: string;
     location?: string;
   };
-  projects: ProfileProjectItem[];
-  services: ProfileServiceItem[];
-  bookings: DashboardBookingItem[];
-  ideas: DashboardIdeaItem[];
-  posts: ProfilePostItem[];
+  projects?: ProfileProjectItem[];
+  services?: ProfileServiceItem[];
+  bookings?: (UnifiedBookingItem | DashboardBookingItem)[];
+  ideas?: DashboardIdeaItem[];
+  posts?: ProfilePostItem[];
   onNavigateSection?: (sectionId: string) => void;
 }
 
 export function WelcomeOverviewSection({
   user,
-  projects,
-  services,
   bookings,
-  ideas,
-  posts,
-  onNavigateSection,
 }: WelcomeOverviewSectionProps) {
   // Time-aware greeting
   const greeting = useMemo(() => {
@@ -61,18 +44,7 @@ export function WelcomeOverviewSection({
     return "Good evening";
   }, []);
 
-  const pendingBookingsCount = bookings.filter((b) => b.status === "Pending").length;
-  const activeProjectsCount = projects.filter(
-    (p) => p.status === "InProgress" || p.status === "InReview"
-  ).length;
-  const publishedServicesCount = services.filter((s) => s.isPublished).length;
-  const activeIdeasCount = ideas.filter((i) => i.stage !== "Completed").length;
-
-  const totalAppreciations = useMemo(() => {
-    const postLikes = posts.reduce((acc, p) => acc + (p.likeCount || 0), 0);
-    const projectLikes = projects.reduce((acc, p) => acc + (p.likeCount || 0), 0);
-    return postLikes + projectLikes;
-  }, [posts, projects]);
+  const activeBookingsCount = bookings ? bookings.length : 3;
 
   return (
     <section aria-label="Welcome Overview" className="space-y-6">
@@ -155,7 +127,7 @@ export function WelcomeOverviewSection({
                   Studio Open for Commissions
                 </span>
                 <span className="inline-flex items-center rounded-full border border-[#203B35]/12 bg-[#FAF8F3] px-3 py-1 text-[11.5px] font-medium text-[#203B35]/80">
-                  3 Bookings Active
+                  {activeBookingsCount} Bookings Active
                 </span>
               </div>
             </div>
@@ -180,123 +152,6 @@ export function WelcomeOverviewSection({
             </Link>
           </div>
         </div>
-      </div>
-
-      {/* ======================================================== */}
-      {/* Activity Overview Metric Cards                           */}
-      {/* ======================================================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-        {/* Metric 1: Active Projects */}
-        <button
-          type="button"
-          onClick={() => onNavigateSection?.("projects")}
-          className="group text-left rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] p-4 sm:p-5 hover:border-[#203B35]/30 hover:shadow-md transition-all relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#5D635F]">
-              Projects
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#9DB5A5]/20 text-[#203B35] group-hover:scale-110 transition-transform">
-              <Layers className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl sm:text-3xl font-medium text-[#203B35]">
-              {projects.length}
-            </span>
-            <span className="text-xs font-medium text-[#4E9F76]">
-              {activeProjectsCount} in progress
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-[#5D635F] line-clamp-1">
-            Latest: {projects[0]?.title || "Studio work"}
-          </p>
-        </button>
-
-        {/* Metric 2: Bookings */}
-        <button
-          type="button"
-          onClick={() => onNavigateSection?.("bookings")}
-          className="group text-left rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] p-4 sm:p-5 hover:border-[#203B35]/30 hover:shadow-md transition-all relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#5D635F]">
-              Bookings
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C8BDE0]/30 text-[#203B35] group-hover:scale-110 transition-transform">
-              <Calendar className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl sm:text-3xl font-medium text-[#203B35]">
-              {bookings.length}
-            </span>
-            {pendingBookingsCount > 0 ? (
-              <span className="inline-flex items-center rounded-full bg-[#E5A93C]/20 px-2 py-0.5 text-[11px] font-semibold text-[#8E5A1C]">
-                {pendingBookingsCount} action needed
-              </span>
-            ) : (
-              <span className="text-xs text-[#5D635F]">All reviewed</span>
-            )}
-          </div>
-          <p className="mt-1 text-xs text-[#5D635F] line-clamp-1">
-            {bookings[0] ? `Next: ${bookings[0].clientName}` : "No bookings"}
-          </p>
-        </button>
-
-        {/* Metric 3: Services */}
-        <button
-          type="button"
-          onClick={() => onNavigateSection?.("services")}
-          className="group text-left rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] p-4 sm:p-5 hover:border-[#203B35]/30 hover:shadow-md transition-all relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#5D635F]">
-              Services
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EFECE2] text-[#203B35] group-hover:scale-110 transition-transform">
-              <Briefcase className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl sm:text-3xl font-medium text-[#203B35]">
-              {services.length}
-            </span>
-            <span className="text-xs font-medium text-[#4E9F76]">
-              {publishedServicesCount} published
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-[#5D635F] line-clamp-1">
-            {services.length - publishedServicesCount} in draft
-          </p>
-        </button>
-
-        {/* Metric 4: Ideas & Collaborations */}
-        <button
-          type="button"
-          onClick={() => onNavigateSection?.("ideas")}
-          className="group text-left rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] p-4 sm:p-5 hover:border-[#203B35]/30 hover:shadow-md transition-all relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#5D635F]">
-              Ideas & Collabs
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#9DB5A5]/20 text-[#203B35] group-hover:scale-110 transition-transform">
-              <Lightbulb className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl sm:text-3xl font-medium text-[#203B35]">
-              {ideas.length}
-            </span>
-            <span className="text-xs font-medium text-[#203B35]">
-              {activeIdeasCount} active spaces
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-[#5D635F] line-clamp-1">
-            {totalAppreciations} total community appreciations
-          </p>
-        </button>
       </div>
     </section>
   );
