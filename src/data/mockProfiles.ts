@@ -43,6 +43,28 @@ export interface ProfileProjectVersion {
   note: string;
 }
 
+export interface ProjectGalleryAsset {
+  id: string;
+  projectId?: string;
+  mediaType: "image" | "video" | "audio" | "document";
+  mediaUrl: string;
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+  posterUrl?: string;
+  caption?: string;
+}
+
+export interface ProjectContributorItem {
+  id?: string;
+  name: string;
+  role: string;
+  username?: string;
+  url?: string | null;
+  urlLabel?: string | null;
+  avatarUrl?: string | null;
+}
+
 export interface ProfileProjectItem {
   id: string;
   title: string;
@@ -65,8 +87,28 @@ export interface ProfileProjectItem {
     tone: string;
     accent: string;
     role: string;
+    url?: string | null;
+    urlLabel?: string | null;
   }>;
   versions: ProfileProjectVersion[];
+  // Structured creator management fields
+  isPublished?: boolean;
+  fullDescription?: string;
+  background?: string;
+  objectives?: string;
+  creativeApproach?: string;
+  galleryAssets?: ProjectGalleryAsset[];
+  skills?: string[];
+  projectType?: "Personal" | "Client" | "Academic";
+  style?: string;
+  duration?: string;
+  completionDate?: string;
+  canvasDimensions?: string;
+  colorProfile?: string;
+  externalUrl?: string;
+  externalUrlLabel?: string;
+  contributors?: ProjectContributorItem[];
+  metadata?: Record<string, unknown> | null;
 }
 
 export type PostKind = "Studio Note" | "Process Log" | "Critique Request" | "Milestone";
@@ -124,6 +166,37 @@ export interface ProfileServiceItem {
   isPublished: boolean;
 }
 
+export type ProfileIdeaStage =
+  | "Spark"
+  | "Concept & Moodboard"
+  | "Active Production"
+  | "Review & Polish"
+  | "Completed";
+
+export interface ProfileIdeaContributor {
+  name: string;
+  username: string;
+  initials: string;
+  tone: string;
+  accent: string;
+  role: string;
+}
+
+export interface ProfileIdeaItem {
+  id: string;
+  title: string;
+  spark: string;
+  discipline: string;
+  stage: ProfileIdeaStage;
+  stageProgress: number;
+  leadName: string;
+  leadUsername: string;
+  contributors: ProfileIdeaContributor[];
+  tags: string[];
+  lastUpdate: string;
+  nextMilestone: string;
+}
+
 export interface UserProfileRecord {
   id: string;
   username: string;
@@ -148,6 +221,7 @@ export interface UserProfileRecord {
     projects: number;
     services: number;
     posts: number;
+    ideas: number;
     followers: number;
     following: number;
     totalLikes: number;
@@ -157,6 +231,7 @@ export interface UserProfileRecord {
   projects: ProfileProjectItem[];
   services: ProfileServiceItem[];
   posts: ProfilePostItem[];
+  ideas: ProfileIdeaItem[];
   followersList: ProfileSocialUser[];
   followingList: ProfileSocialUser[];
 }
@@ -369,6 +444,8 @@ const ANYA_PROJECTS: ProfileProjectItem[] = [
         tone: "#2D3C38",
         accent: "#F6F3EB",
         role: "Art Director",
+        url: "https://elenarostova.design",
+        urlLabel: "View Portfolio",
       },
     ],
     versions: [
@@ -419,6 +496,8 @@ const ANYA_PROJECTS: ProfileProjectItem[] = [
         tone: "#27413B",
         accent: "#C8BDE0",
         role: "Director",
+        url: "https://vimeo.com/rohanverma",
+        urlLabel: "View Contribution",
       },
       {
         name: "Mateo Silva",
@@ -1223,6 +1302,271 @@ const ELENA_SERVICES: ProfileServiceItem[] = [
   },
 ];
 
+const ANYA_IDEAS: ProfileIdeaItem[] = [
+  {
+    id: "idea-bioluminescence",
+    title: "Bioluminescent Forest VR & Ambient Soundscape",
+    spark:
+      "Merging botanical macro gouache studies of glowing fungi with generative 3D shaders and modular ambient synthesizer soundscapes.",
+    discipline: "Animation & Sound",
+    stage: "Active Production",
+    stageProgress: 65,
+    leadName: "Anya Sharma",
+    leadUsername: "anya_art",
+    contributors: [
+      {
+        name: "Anya Sharma",
+        username: "anya_art",
+        initials: "AS",
+        tone: "#203B35",
+        accent: "#C8BDE0",
+        role: "Visual Lead & Gouache Assets",
+      },
+      {
+        name: "Rohan Verma",
+        username: "rohan_anim",
+        initials: "RV",
+        tone: "#27413B",
+        accent: "#C8BDE0",
+        role: "3D Animation & Shaders",
+      },
+      {
+        name: "Grace Chen",
+        username: "grace_music",
+        initials: "GC",
+        tone: "#304D45",
+        accent: "#9DB5A5",
+        role: "Ambient Modular Audio",
+      },
+    ],
+    tags: ["vr", "bioluminescence", "generative", "soundscape"],
+    lastUpdate: "Grace added 2 ambient audio tracks yesterday",
+    nextMilestone: "Interactive WebGL prototype preview (Dec 06)",
+  },
+  {
+    id: "idea-solstice-zine",
+    title: "Alpine Typographic Specimen & Folded Zine",
+    spark:
+      "A limited-run risograph publication pairing Swiss asymmetric typography, high-altitude lichen photography, and poetry.",
+    discipline: "Graphic Design & Print",
+    stage: "Concept & Moodboard",
+    stageProgress: 35,
+    leadName: "Elena Rostova",
+    leadUsername: "elena_type",
+    contributors: [
+      {
+        name: "Elena Rostova",
+        username: "elena_type",
+        initials: "ER",
+        tone: "#2D3C38",
+        accent: "#F6F3EB",
+        role: "Initiator & Typographer",
+      },
+      {
+        name: "Anya Sharma",
+        username: "anya_art",
+        initials: "AS",
+        tone: "#203B35",
+        accent: "#C8BDE0",
+        role: "Botanical Endpapers",
+      },
+      {
+        name: "Kenji Sato",
+        username: "kenji_film",
+        initials: "KS",
+        tone: "#3B4A44",
+        accent: "#9DB5A5",
+        role: "Medium-Format Film Plates",
+      },
+    ],
+    tags: ["risograph", "zine", "typography", "lichen"],
+    lastUpdate: "Elena shared 3 folded dummy prototypes 3 days ago",
+    nextMilestone: "Paper weight & dual-drum ink selection (Dec 10)",
+  },
+  {
+    id: "idea-sumie-motion",
+    title: "Sumi-e Fluid Motion Graphic Experiments",
+    spark:
+      "Investigating the physical friction of wet ink against handmade washi paper, translated into procedural 2D particle simulations.",
+    discipline: "Digital Art & Film",
+    stage: "Spark",
+    stageProgress: 15,
+    leadName: "Anya Sharma",
+    leadUsername: "anya_art",
+    contributors: [
+      {
+        name: "Anya Sharma",
+        username: "anya_art",
+        initials: "AS",
+        tone: "#203B35",
+        accent: "#C8BDE0",
+        role: "Ink Studies & Texture Library",
+      },
+    ],
+    tags: ["sumi-e", "ink", "fluid-dynamics", "particles"],
+    lastUpdate: "Moodboard & wet-ink wash studies added 5 days ago",
+    nextMilestone: "Procedural brush-stroke particle timing study",
+  },
+  {
+    id: "idea-ceramic-archive",
+    title: "Earthen Glaze & Mineral Pigment Open Archive",
+    spark:
+      "A collective open-source digital library documenting natural clay slips, wood-ash glazes, and botanical dyes with high-resolution reflectance scans.",
+    discipline: "Ceramics & Print",
+    stage: "Completed",
+    stageProgress: 100,
+    leadName: "Mateo Silva",
+    leadUsername: "mateo_ux",
+    contributors: [
+      {
+        name: "Mateo Silva",
+        username: "mateo_ux",
+        initials: "MS",
+        tone: "#4A5952",
+        accent: "#C8BDE0",
+        role: "Archive Architecture & UI",
+      },
+      {
+        name: "Anya Sharma",
+        username: "anya_art",
+        initials: "AS",
+        tone: "#203B35",
+        accent: "#C8BDE0",
+        role: "Pigment Swatch Documentation",
+      },
+    ],
+    tags: ["ceramics", "pigments", "open-source", "archive"],
+    lastUpdate: "Archive v1.0 published and indexed on CreativeSpace",
+    nextMilestone: "Project concluded and archived",
+  },
+];
+
+const KENJI_IDEAS: ProfileIdeaItem[] = [
+  {
+    id: "idea-kenji-daylight-monograph",
+    title: "Travertine & Morning Silence — Unbound Contact Monograph",
+    spark:
+      "Sequencing uncropped medium-format silver gelatin proof sheets by solar elevation angle to trace how quiet stone rooms hold dawn light.",
+    discipline: "Photography & Writing",
+    stage: "Review & Polish",
+    stageProgress: 85,
+    leadName: "Kenji Sato",
+    leadUsername: "kenji_film",
+    contributors: [
+      {
+        name: "Kenji Sato",
+        username: "kenji_film",
+        initials: "KS",
+        tone: "#3B4A44",
+        accent: "#9DB5A5",
+        role: "Photography & Sequencing",
+      },
+    ],
+    tags: ["medium-format", "architecture", "monograph", "daylight"],
+    lastUpdate: "Updated colophon & plate index 2 days ago",
+    nextMilestone: "Duotone offset proof check with Kyoto press",
+  },
+  {
+    id: "idea-solstice-zine-kenji",
+    title: "Alpine Typographic Specimen & Folded Zine",
+    spark:
+      "A limited-run risograph publication pairing Swiss asymmetric typography, high-altitude lichen photography, and poetry.",
+    discipline: "Graphic Design & Print",
+    stage: "Concept & Moodboard",
+    stageProgress: 35,
+    leadName: "Elena Rostova",
+    leadUsername: "elena_type",
+    contributors: [
+      {
+        name: "Elena Rostova",
+        username: "elena_type",
+        initials: "ER",
+        tone: "#2D3C38",
+        accent: "#F6F3EB",
+        role: "Initiator & Typographer",
+      },
+      {
+        name: "Kenji Sato",
+        username: "kenji_film",
+        initials: "KS",
+        tone: "#3B4A44",
+        accent: "#9DB5A5",
+        role: "Medium-Format Film Plates",
+      },
+    ],
+    tags: ["risograph", "zine", "typography", "lichen"],
+    lastUpdate: "Delivered 6 alpine film drum scans 3 days ago",
+    nextMilestone: "Paper weight & dual-drum ink selection (Dec 10)",
+  },
+];
+
+const ELENA_IDEAS: ProfileIdeaItem[] = [
+  {
+    id: "idea-solstice-zine-elena",
+    title: "Alpine Typographic Specimen & Folded Zine",
+    spark:
+      "A limited-run risograph publication pairing Swiss asymmetric typography, high-altitude lichen photography, and poetry.",
+    discipline: "Graphic Design & Print",
+    stage: "Concept & Moodboard",
+    stageProgress: 35,
+    leadName: "Elena Rostova",
+    leadUsername: "elena_type",
+    contributors: [
+      {
+        name: "Elena Rostova",
+        username: "elena_type",
+        initials: "ER",
+        tone: "#2D3C38",
+        accent: "#F6F3EB",
+        role: "Initiator & Typographer",
+      },
+      {
+        name: "Anya Sharma",
+        username: "anya_art",
+        initials: "AS",
+        tone: "#203B35",
+        accent: "#C8BDE0",
+        role: "Botanical Endpapers",
+      },
+      {
+        name: "Kenji Sato",
+        username: "kenji_film",
+        initials: "KS",
+        tone: "#3B4A44",
+        accent: "#9DB5A5",
+        role: "Medium-Format Film Plates",
+      },
+    ],
+    tags: ["risograph", "zine", "typography", "lichen"],
+    lastUpdate: "Shared 3 folded dummy prototypes 3 days ago",
+    nextMilestone: "Paper weight & dual-drum ink selection (Dec 10)",
+  },
+  {
+    id: "idea-elena-herbarium-grotesk",
+    title: "Herbarium Serif & Botanical Marginalia System",
+    spark:
+      "A variable editorial typeface inspired by 19th-century alpine field catalogs, built for bilingual exhibition captions and scholarly monographs.",
+    discipline: "Typography & UI/UX",
+    stage: "Active Production",
+    stageProgress: 60,
+    leadName: "Elena Rostova",
+    leadUsername: "elena_type",
+    contributors: [
+      {
+        name: "Elena Rostova",
+        username: "elena_type",
+        initials: "ER",
+        tone: "#2D3C38",
+        accent: "#F6F3EB",
+        role: "Type Design & Specimen",
+      },
+    ],
+    tags: ["typography", "variable-font", "editorial", "herbarium"],
+    lastUpdate: "Completed italic optical master & diacritics yesterday",
+    nextMilestone: "Specimen booklet layout & optical size kerning",
+  },
+];
+
 export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
   anya_art: {
     id: "user-anya-art",
@@ -1253,6 +1597,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
       projects: ANYA_PROJECTS.length,
       services: ANYA_SERVICES.filter((s) => s.isPublished).length,
       posts: ANYA_POSTS.length,
+      ideas: ANYA_IDEAS.length,
       followers: 1284,
       following: 164,
       totalLikes: 1729,
@@ -1262,6 +1607,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
     projects: ANYA_PROJECTS,
     services: ANYA_SERVICES,
     posts: ANYA_POSTS,
+    ideas: ANYA_IDEAS,
     followersList: SHARED_NETWORK_USERS,
     followingList: SHARED_NETWORK_USERS.slice(0, 3),
   },
@@ -1293,6 +1639,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
       projects: KENJI_PROJECTS.length,
       services: KENJI_SERVICES.filter((s) => s.isPublished).length,
       posts: KENJI_POSTS.length,
+      ideas: KENJI_IDEAS.length,
       followers: 892,
       following: 118,
       totalLikes: 517,
@@ -1302,6 +1649,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
     projects: KENJI_PROJECTS,
     services: KENJI_SERVICES,
     posts: KENJI_POSTS,
+    ideas: KENJI_IDEAS,
     followersList: SHARED_NETWORK_USERS.slice(1),
     followingList: SHARED_NETWORK_USERS.slice(0, 4),
   },
@@ -1333,6 +1681,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
       projects: ELENA_PROJECTS.length,
       services: ELENA_SERVICES.filter((s) => s.isPublished).length,
       posts: ELENA_POSTS.length,
+      ideas: ELENA_IDEAS.length,
       followers: 1540,
       following: 95,
       totalLikes: 573,
@@ -1342,6 +1691,7 @@ export const MOCK_PROFILES: Record<string, UserProfileRecord> = {
     projects: ELENA_PROJECTS,
     services: ELENA_SERVICES,
     posts: ELENA_POSTS,
+    ideas: ELENA_IDEAS,
     followersList: SHARED_NETWORK_USERS,
     followingList: SHARED_NETWORK_USERS.slice(0, 2),
   },
@@ -1411,6 +1761,7 @@ export function resolveMockProfile(rawUsername: string): UserProfileRecord {
       projects: 3,
       services: 2,
       posts: 2,
+      ideas: 2,
       followers: 248,
       following: 74,
       totalLikes: 420,
@@ -1439,6 +1790,22 @@ export function resolveMockProfile(rawUsername: string): UserProfileRecord {
     posts: ANYA_POSTS.slice(0, 2).map((post, idx) => ({
       ...post,
       id: `${safeHandle}-post-${idx}`,
+    })),
+    ideas: ANYA_IDEAS.slice(0, 2).map((idea, idx) => ({
+      ...idea,
+      id: `${safeHandle}-idea-${idx}`,
+      leadName: displayName,
+      leadUsername: safeHandle,
+      contributors: [
+        {
+          name: displayName,
+          username: safeHandle,
+          initials,
+          tone: "#203B35",
+          accent: "#9DB5A5",
+          role: "Concept Lead",
+        },
+      ],
     })),
     followersList: SHARED_NETWORK_USERS.slice(0, 3),
     followingList: SHARED_NETWORK_USERS.slice(1, 3),

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Image from "next/image";
-import { ArrowUpRight, Briefcase, Clock, EyeOff, Sparkles } from "lucide-react";
+import { ArrowUpRight, Briefcase, Calendar, Clock, EyeOff, Sparkles } from "lucide-react";
 import { CelestialSpark } from "@/components/landing/CreativeSpaceBrand";
 import {
   formatServicePrice,
@@ -15,7 +15,7 @@ interface ProfileServicesTabProps {
   services: ProfileServiceItem[];
   perspective: ProfilePerspective;
   ownerDisplayName: string;
-  onSelectService: (service: ProfileServiceItem) => void;
+  onSelectService: (service: ProfileServiceItem, initialMode?: "details" | "booking") => void;
 }
 
 export function getAvailabilityStyle(status: ServiceAvailabilityStatus): {
@@ -156,7 +156,7 @@ export function ProfileServicesTab({
                 {/* Cover Preview */}
                 <button
                   type="button"
-                  onClick={() => onSelectService(service)}
+                  onClick={() => onSelectService(service, "details")}
                   className="relative block aspect-[16/10] w-full overflow-hidden rounded-[10px] bg-[#EFECE2] border border-[#203B35]/10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]"
                   aria-label={`View service details for ${service.title}`}
                 >
@@ -233,16 +233,38 @@ export function ProfileServicesTab({
                       </div>
                     </div>
 
-                    {/* View Service Details CTA */}
-                    <button
-                      type="button"
-                      onClick={() => onSelectService(service)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#203B35]/20 bg-[#FAF8F3] px-4 py-2.5 text-[13px] font-medium text-[#203B35] hover:bg-[#203B35] hover:text-[#F6F3EB] hover:border-[#203B35] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-[#9DB5A5]" />
-                      <span>View Service Details</span>
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Action CTAs: Details + Request Booking */}
+                    {isDraft ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectService(service, "details")}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-dashed border-[#203B35]/30 bg-[#FAF8F3] px-4 py-2.5 text-[12.5px] font-medium text-[#5D635F] hover:bg-[#EFECE2] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
+                      >
+                        <EyeOff className="h-3.5 w-3.5 text-[#5D635F]" />
+                        <span>View Draft Specs</span>
+                      </button>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectService(service, "details")}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[#203B35]/20 bg-[#FAF8F3] px-3 py-2 text-[12.5px] font-medium text-[#203B35] hover:bg-[#EFECE2] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
+                          aria-label={`View details for ${service.title}`}
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-[#9DB5A5]" />
+                          <span>Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelectService(service, "booking")}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#203B35] px-3 py-2 text-[12.5px] font-medium text-[#F6F3EB] hover:bg-[#162A26] transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
+                          aria-label={`Request booking for ${service.title}`}
+                        >
+                          <Calendar className="h-3.5 w-3.5 text-[#9DB5A5]" />
+                          <span>Book</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </article>
