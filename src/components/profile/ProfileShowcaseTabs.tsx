@@ -4,17 +4,16 @@ import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowUpRight,
   Bookmark,
   Briefcase,
   Feather,
   GitBranch,
   Heart,
   Layers,
+  Lightbulb,
   MessageCircle,
   Plus,
   Send,
-  Sparkles,
   User,
 } from "lucide-react";
 import { CelestialSpark, CreatorAvatar } from "@/components/landing/CreativeSpaceBrand";
@@ -23,20 +22,28 @@ import type {
   ProfilePerspective,
   ProfilePostComment,
   ProfilePostItem,
-  ProfileProjectItem,
   ProfileServiceItem,
   UserProfileRecord,
 } from "@/data/mockProfiles";
+import {
+  ProfileProjectCard,
+  type ProfileDisplayProject,
+} from "./ProfileProjectCard";
 import { ProfileServicesTab } from "./ProfileServicesTab";
+import { ProfileIdeasTab } from "./ProfileIdeasTab";
 import { ProfileAboutTab } from "./ProfileAboutTab";
 
-export type ProfileTab = "works" | "services" | "posts" | "about";
+export type ProfileTab = "works" | "services" | "posts" | "ideas" | "about";
 
 interface ProfileShowcaseTabsProps {
   activeTab: ProfileTab;
   onTabChange: (tab: ProfileTab) => void;
   perspective: ProfilePerspective;
   profile: UserProfileRecord;
+  projects: ProfileDisplayProject[];
+  projectsLoading?: boolean;
+  projectsError?: string | null;
+  onRetryProjects?: () => void;
   publishedServicesCount: number;
   likedProjectIds: Record<string, boolean>;
   savedProjectIds: Record<string, boolean>;
@@ -44,8 +51,8 @@ interface ProfileShowcaseTabsProps {
   savedPostIds: Record<string, boolean>;
   onToggleProjectLike: (projectId: string) => void;
   onToggleProjectSave: (projectId: string) => void;
-  onSelectProject: (project: ProfileProjectItem) => void;
-  onSelectService: (service: ProfileServiceItem) => void;
+  onSelectProject: (project: ProfileDisplayProject) => void;
+  onSelectService: (service: ProfileServiceItem, initialMode?: "details" | "booking") => void;
   onTogglePostLike: (postId: string) => void;
   onTogglePostSave: (postId: string) => void;
   onAddPostComment: (postId: string, comment: ProfilePostComment) => void;
@@ -80,6 +87,10 @@ export function ProfileShowcaseTabs({
   onTabChange,
   perspective,
   profile,
+  projects,
+  projectsLoading = false,
+  projectsError = null,
+  onRetryProjects,
   publishedServicesCount,
   likedProjectIds,
   savedProjectIds,
@@ -102,9 +113,9 @@ export function ProfileShowcaseTabs({
     avatarInitials: ownerInitials,
     avatarTone: ownerTone,
     avatarAccent: ownerAccent,
-    projects,
     services,
     posts,
+    ideas,
   } = profile;
   const visibleServicesCount =
     perspective === "owner" ? services.length : publishedServicesCount;
@@ -127,25 +138,32 @@ export function ProfileShowcaseTabs({
     return ["All", ...Array.from(set)];
   }, [projects]);
 
+  const effectiveDisciplineFilter = availableDisciplines.includes(disciplineFilter)
+    ? disciplineFilter
+    : "All";
+
   const filteredProjects = useMemo(() => {
     const base =
-      disciplineFilter === "All"
+      effectiveDisciplineFilter === "All"
         ? [...projects]
-        : projects.filter((p) => p.discipline === disciplineFilter);
+        : projects.filter((p) => p.discipline === effectiveDisciplineFilter);
 
     if (projectSort === "likes") {
-      return base.sort(
-        (a, b) =>
-          b.likeCount +
-          (likedProjectIds[b.id] ? 1 : 0) -
-          (a.likeCount + (likedProjectIds[a.id] ? 1 : 0))
-      );
+      return base.sort((a, b) => {
+        const bLiked = Boolean(likedProjectIds[b.id]);
+        const bInitial = Boolean(b.hasLiked);
+        const bScore = b.likeCount + (bLiked === bInitial ? 0 : bLiked ? 1 : -1);
+        const aLiked = Boolean(likedProjectIds[a.id]);
+        const aInitial = Boolean(a.hasLiked);
+        const aScore = a.likeCount + (aLiked === aInitial ? 0 : aLiked ? 1 : -1);
+        return bScore - aScore;
+      });
     }
     if (projectSort === "featured") {
       return base.sort((a, b) => Number(b.featured) - Number(a.featured));
     }
     return base;
-  }, [projects, disciplineFilter, projectSort, likedProjectIds]);
+  }, [projects, effectiveDisciplineFilter, projectSort, likedProjectIds]);
 
   const filteredPosts = useMemo(() => {
     if (postKindFilter === "All") return posts;
@@ -214,11 +232,11 @@ export function ProfileShowcaseTabs({
       {/* Unified Tab Header & Sub-Filters */}
       <div className="flex flex-col gap-5 border-b border-[#203B35]/15 pb-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Primary Tabs: Works | Services | Posts | About */}
+          {/* Primary Tabs: Works | Services | Posts | Ideas | About */}
           <div
             role="tablist"
             aria-label="Profile showcase sections"
-            className="grid grid-cols-4 sm:inline-flex w-full sm:w-fit items-center rounded-2xl sm:rounded-full border border-[#203B35]/15 bg-[#FAF8F3] p-1 gap-1 sm:gap-0"
+            className="flex sm:inline-flex w-full sm:w-fit items-center overflow-x-auto rounded-full border border-[#203B35]/15 bg-[#FAF8F3] p-1 gap-1"
           >
             <button
               type="button"
@@ -227,7 +245,7 @@ export function ProfileShowcaseTabs({
               id="tab-works"
               aria-controls="panel-works"
               onClick={() => onTabChange("works")}
-              className={`inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-full px-2 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+              className={`inline-flex shrink-0 whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
                 activeTab === "works"
                   ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
                   : "text-[#5D635F] hover:text-[#203B35]"
@@ -253,7 +271,7 @@ export function ProfileShowcaseTabs({
               id="tab-services"
               aria-controls="panel-services"
               onClick={() => onTabChange("services")}
-              className={`inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-full px-2 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+              className={`inline-flex shrink-0 whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
                 activeTab === "services"
                   ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
                   : "text-[#5D635F] hover:text-[#203B35]"
@@ -279,7 +297,7 @@ export function ProfileShowcaseTabs({
               id="tab-posts"
               aria-controls="panel-posts"
               onClick={() => onTabChange("posts")}
-              className={`inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-full px-2 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+              className={`inline-flex shrink-0 whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
                 activeTab === "posts"
                   ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
                   : "text-[#5D635F] hover:text-[#203B35]"
@@ -301,11 +319,37 @@ export function ProfileShowcaseTabs({
             <button
               type="button"
               role="tab"
+              aria-selected={activeTab === "ideas"}
+              id="tab-ideas"
+              aria-controls="panel-ideas"
+              onClick={() => onTabChange("ideas")}
+              className={`inline-flex shrink-0 whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+                activeTab === "ideas"
+                  ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
+                  : "text-[#5D635F] hover:text-[#203B35]"
+              }`}
+            >
+              <Lightbulb className="hidden sm:inline h-3.5 w-3.5 shrink-0" />
+              <span>Ideas</span>
+              <span
+                className={`rounded-full px-1.5 sm:px-2 py-0.5 font-mono text-[10px] sm:text-[10.5px] tabular-nums ${
+                  activeTab === "ideas"
+                    ? "bg-[#F6F3EB]/20 text-[#F6F3EB]"
+                    : "bg-[#EFECE2] text-[#203B35]"
+                }`}
+              >
+                {ideas.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
               aria-selected={activeTab === "about"}
               id="tab-about"
               aria-controls="panel-about"
               onClick={() => onTabChange("about")}
-              className={`inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-full px-2 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+              className={`inline-flex shrink-0 whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-5 py-2 text-[12px] sm:text-[13.5px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
                 activeTab === "about"
                   ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
                   : "text-[#5D635F] hover:text-[#203B35]"
@@ -359,7 +403,7 @@ export function ProfileShowcaseTabs({
             aria-label="Filter works by discipline"
           >
             {availableDisciplines.map((disc) => {
-              const active = disciplineFilter === disc;
+              const active = effectiveDisciplineFilter === disc;
               return (
                 <button
                   key={disc}
@@ -414,183 +458,74 @@ export function ProfileShowcaseTabs({
           aria-labelledby="tab-works"
           className="mt-7"
         >
-          {filteredProjects.length === 0 ? (
+          {projectsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+              {[0, 1, 2].map((skeletonIdx) => (
+                <div
+                  key={skeletonIdx}
+                  className="rounded-[16px] border border-[#203B35]/10 bg-[#FAF8F3] p-3.5 space-y-3"
+                >
+                  <div className="aspect-[4/3] w-full rounded-[10px] bg-[#EFECE2] animate-pulse" />
+                  <div className="h-5 w-3/4 rounded bg-[#EFECE2] animate-pulse" />
+                  <div className="h-4 w-full rounded bg-[#EFECE2] animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : projectsError ? (
             <div className="rounded-2xl border border-[#203B35]/15 bg-[#FAF8F3] px-6 py-14 text-center">
               <CelestialSpark className="h-5 w-5 text-[#9DB5A5] mx-auto mb-3" />
               <p className="font-serif text-2xl text-[#203B35]">
-                No projects in this discipline yet
+                Unable to load published works
               </p>
               <p className="mt-2 text-[14px] text-[#5D635F]">
-                Switch back to All disciplines to explore {ownerDisplayName}&apos;s exhibited works.
+                {projectsError}
               </p>
-              <button
-                type="button"
-                onClick={() => setDisciplineFilter("All")}
-                className="mt-5 rounded-full bg-[#203B35] px-5 py-2 text-[13px] font-medium text-[#F6F3EB] hover:bg-[#162A26] transition-colors"
-              >
-                Show All Projects
-              </button>
+              {onRetryProjects && (
+                <button
+                  type="button"
+                  onClick={onRetryProjects}
+                  className="mt-5 rounded-full bg-[#203B35] px-5 py-2 text-[13px] font-medium text-[#F6F3EB] hover:bg-[#162A26] transition-colors"
+                >
+                  Try Again
+                </button>
+              )}
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="rounded-2xl border border-[#203B35]/15 bg-[#FAF8F3] px-6 py-14 text-center">
+              <CelestialSpark className="h-5 w-5 text-[#9DB5A5] mx-auto mb-3" />
+              <p className="font-serif text-2xl text-[#203B35]">
+                {projects.length === 0
+                  ? "No published works yet"
+                  : "No projects in this discipline yet"}
+              </p>
+              <p className="mt-2 text-[14px] text-[#5D635F]">
+                {projects.length === 0
+                  ? `${ownerDisplayName} has not published any public projects yet.`
+                  : `Switch back to All disciplines to explore ${ownerDisplayName}'s exhibited works.`}
+              </p>
+              {disciplineFilter !== "All" && (
+                <button
+                  type="button"
+                  onClick={() => setDisciplineFilter("All")}
+                  className="mt-5 rounded-full bg-[#203B35] px-5 py-2 text-[13px] font-medium text-[#F6F3EB] hover:bg-[#162A26] transition-colors"
+                >
+                  Show All Projects
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-              {filteredProjects.map((project) => {
-                const isLiked = Boolean(likedProjectIds[project.id]);
-                const isSaved = Boolean(savedProjectIds[project.id]);
-                const likesDisplay = project.likeCount + (isLiked ? 1 : 0);
-
-                return (
-                  <article
-                    key={project.id}
-                    className="group flex flex-col rounded-[16px] border border-[#203B35]/15 bg-[#FAF8F3] p-3.5 transition-all duration-300 hover:border-[#203B35]/30 hover:shadow-[0_18px_42px_-26px_rgba(32,59,53,0.3)]"
-                  >
-                    {/* Artwork Thumbnail Trigger */}
-                    <button
-                      type="button"
-                      onClick={() => onSelectProject(project)}
-                      className="relative block aspect-[4/3] w-full overflow-hidden rounded-[10px] bg-[#EFECE2] border border-[#203B35]/10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]"
-                      aria-label={`Inspect project ${project.title}`}
-                    >
-                      <Image
-                        src={project.coverUrl}
-                        alt={project.coverAlt}
-                        fill
-                        sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 31vw"
-                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                      />
-
-                      {/* Discipline Tag */}
-                      <span className="absolute top-2.5 left-2.5 rounded-full bg-[#F6F3EB]/95 backdrop-blur-sm px-2.5 py-1 text-[10.5px] font-medium text-[#203B35] border border-[#203B35]/10">
-                        {project.discipline}
-                      </span>
-
-                      {/* Version Badge */}
-                      <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-[#203B35]/85 backdrop-blur-sm px-2.5 py-1 font-mono text-[10px] text-[#F6F3EB]">
-                        <GitBranch className="h-2.5 w-2.5 text-[#9DB5A5]" />
-                        {project.versionTag}
-                      </span>
-
-                      {project.featured && (
-                        <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-[#FAF8F3]/95 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-medium text-[#203B35] border border-[#203B35]/10">
-                          <Sparkles className="h-2.5 w-2.5 text-[#9DB5A5]" />
-                          Featured
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Content */}
-                    <div className="mt-3.5 flex flex-1 flex-col justify-between px-0.5">
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onSelectProject(project)}
-                            className="text-left font-serif text-[1.4rem] leading-[1.15] text-[#203B35] group-hover:text-[#162A26] transition-colors focus:outline-none"
-                          >
-                            {project.title}
-                          </button>
-                          <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[#5D635F] opacity-60 group-hover:opacity-100 group-hover:text-[#203B35] transition-all" />
-                        </div>
-
-                        <p className="mt-2 text-[13px] leading-[1.6] text-[#282B2A]/80 line-clamp-2">
-                          {project.description}
-                        </p>
-
-                        {/* Tags */}
-                        {project.tags.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {project.tags.slice(0, 3).map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-md bg-[#EFECE2]/85 px-2 py-0.5 font-mono text-[10.5px] text-[#5D635F]"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Footer Metadata & Actions */}
-                      <div className="mt-4 pt-3 border-t border-[#203B35]/10 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {project.collaborators.length > 0 && (
-                            <div className="flex -space-x-1.5 shrink-0">
-                              {project.collaborators.slice(0, 2).map((col) => (
-                                <CreatorAvatar
-                                  key={col.username}
-                                  initials={col.initials}
-                                  tone={col.tone}
-                                  accent={col.accent}
-                                  name={`${col.name} (${col.role})`}
-                                  size="xs"
-                                />
-                              ))}
-                            </div>
-                          )}
-                          <span className="font-mono text-[11px] text-[#5D635F] truncate">
-                            {project.updatedAt}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => onToggleProjectLike(project.id)}
-                            aria-pressed={isLiked}
-                            aria-label={
-                              isLiked
-                                ? `Remove appreciation from ${project.title}`
-                                : `Appreciate ${project.title}`
-                            }
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
-                              isLiked
-                                ? "bg-[#203B35]/10 text-[#203B35] font-medium"
-                                : "text-[#5D635F] hover:bg-[#EFECE2] hover:text-[#203B35]"
-                            }`}
-                          >
-                            <Heart
-                              className={`h-3.5 w-3.5 ${
-                                isLiked ? "fill-[#203B35] text-[#203B35]" : ""
-                              }`}
-                            />
-                            <span className="tabular-nums">{likesDisplay}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onSelectProject(project)}
-                            aria-label={`View discussion for ${project.title}`}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] text-[#5D635F] hover:bg-[#EFECE2] hover:text-[#203B35] transition-colors"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            <span className="tabular-nums">{project.commentCount}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onToggleProjectSave(project.id)}
-                            aria-pressed={isSaved}
-                            aria-label={
-                              isSaved
-                                ? `Remove ${project.title} from bookmarks`
-                                : `Bookmark ${project.title}`
-                            }
-                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
-                              isSaved
-                                ? "bg-[#203B35] text-[#F6F3EB]"
-                                : "text-[#5D635F] hover:bg-[#EFECE2] hover:text-[#203B35]"
-                            }`}
-                          >
-                            <Bookmark
-                              className={`h-3.5 w-3.5 ${isSaved ? "fill-current" : ""}`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+              {filteredProjects.map((project) => (
+                <ProfileProjectCard
+                  key={project.id}
+                  project={project}
+                  isLiked={Boolean(likedProjectIds[project.id])}
+                  isSaved={Boolean(savedProjectIds[project.id])}
+                  onToggleLike={onToggleProjectLike}
+                  onToggleSave={onToggleProjectSave}
+                  onSelectProject={onSelectProject}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -976,12 +911,24 @@ export function ProfileShowcaseTabs({
       )}
 
       {/* ================================================================= */}
+      {/* IDEAS PANEL                                                       */}
+      {/* ================================================================= */}
+      {activeTab === "ideas" && (
+        <ProfileIdeasTab
+          ideas={ideas}
+          perspective={perspective}
+          ownerDisplayName={ownerDisplayName}
+        />
+      )}
+
+      {/* ================================================================= */}
       {/* ABOUT PANEL                                                       */}
       {/* ================================================================= */}
       {activeTab === "about" && (
         <ProfileAboutTab
           profile={profile}
           perspective={perspective}
+          projectsCount={projects.length}
           publishedServicesCount={publishedServicesCount}
           onOpenEditModal={onOpenEditModal}
           onSelectTab={onTabChange}

@@ -9,60 +9,45 @@ import {
   Clock,
   Eye,
   MapPin,
-  MessageSquarePlus,
   PencilLine,
   Share2,
   Sparkles,
-  UserCheck,
   UserPlus,
-  Users,
 } from "lucide-react";
 import { CelestialSpark } from "@/components/landing/CreativeSpaceBrand";
-import type { ViewerConnectionState } from "@/lib/features/profile";
 import type { ProfilePerspective, UserProfileRecord } from "@/data/mockProfiles";
 import { ProfileAvatarBadge, ProfileCoverArtwork } from "./ProfileVisualMedia";
 
 interface ProfileHeroSectionProps {
   profile: UserProfileRecord;
   perspective: ProfilePerspective;
+  projectsCount?: number;
   publishedServicesCount: number;
   isFollowing: boolean;
-  connectionState: ViewerConnectionState;
   copiedLink: boolean;
   onOpenEditModal: () => void;
   onToggleFollow: () => void;
-  onToggleConnect: () => void;
-  onOpenCollaborate: () => void;
   onCopyShareLink: () => void;
   onPerspectiveChange: (mode: ProfilePerspective) => void;
-  onSelectShowcaseTab: (tab: "works" | "services" | "posts" | "about") => void;
+  onSelectShowcaseTab: (tab: "works" | "services" | "posts" | "ideas" | "about") => void;
   onOpenSocialModal: (tab: "followers" | "following") => void;
 }
 
 export function ProfileHeroSection({
   profile,
   perspective,
+  projectsCount,
   publishedServicesCount,
   isFollowing,
-  connectionState,
   copiedLink,
   onOpenEditModal,
   onToggleFollow,
-  onToggleConnect,
-  onOpenCollaborate,
   onCopyShareLink,
   onPerspectiveChange,
   onSelectShowcaseTab,
   onOpenSocialModal,
 }: ProfileHeroSectionProps) {
   const isOwner = perspective === "owner";
-
-  const connectionButtonLabel =
-    connectionState === "accepted"
-      ? "Connected"
-      : connectionState === "pending_outgoing"
-      ? "Request Sent"
-      : "Connect";
 
   return (
     <section aria-label="Creator profile overview">
@@ -81,7 +66,7 @@ export function ProfileHeroSection({
                 <span className="truncate">Studio Folio · @{profile.username}</span>
               </span>
 
-              {isOwner ? (
+              {isOwner && (
                 <button
                   type="button"
                   onClick={onOpenEditModal}
@@ -92,14 +77,6 @@ export function ProfileHeroSection({
                     Edit Cover<span className="hidden sm:inline"> &amp; Info</span>
                   </span>
                 </button>
-              ) : (
-                profile.openToCollab && (
-                  <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#203B35]/90 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[11px] sm:text-[11.5px] font-medium text-[#F6F3EB] border border-[#9DB5A5]/40 shadow-sm">
-                    <span className="h-2 w-2 rounded-full bg-[#9DB5A5]" />
-                    <span className="hidden sm:inline">Open to Collaborations</span>
-                    <span className="sm:hidden">Open to Collab</span>
-                  </span>
-                )
               )}
             </div>
           </div>
@@ -244,35 +221,6 @@ export function ProfileHeroSection({
 
                   <button
                     type="button"
-                    onClick={onToggleConnect}
-                    aria-pressed={connectionState !== "none"}
-                    className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
-                      connectionState === "accepted"
-                        ? "border-[#9DB5A5] bg-[#9DB5A5]/20 text-[#203B35]"
-                        : connectionState === "pending_outgoing"
-                        ? "border-[#C8BDE0] bg-[#C8BDE0]/20 text-[#203B35]"
-                        : "border-[#203B35]/20 bg-[#F6F3EB] text-[#203B35] hover:border-[#203B35]/45 hover:bg-[#EFECE2]"
-                    }`}
-                  >
-                    {connectionState === "accepted" ? (
-                      <UserCheck className="h-4 w-4 text-[#203B35]" />
-                    ) : (
-                      <Users className="h-4 w-4 text-[#5D635F]" />
-                    )}
-                    <span>{connectionButtonLabel}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onOpenCollaborate}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full border border-[#203B35]/20 bg-[#FAF8F3] px-4 py-2 text-[13.5px] font-medium text-[#203B35] hover:border-[#203B35]/45 hover:bg-[#EFECE2] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
-                  >
-                    <MessageSquarePlus className="h-4 w-4 text-[#5D635F]" />
-                    <span>Collaborate</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={onCopyShareLink}
                     aria-label={copiedLink ? "Profile link copied" : "Share profile link"}
                     className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-full border border-[#203B35]/20 bg-[#F6F3EB] text-[#203B35] hover:border-[#203B35]/40 hover:bg-[#EFECE2] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40"
@@ -312,7 +260,7 @@ export function ProfileHeroSection({
                 className="rounded-xl border border-[#203B35]/10 bg-[#F6F3EB] px-3.5 py-2 text-left hover:border-[#203B35]/30 transition-colors"
               >
                 <span className="font-serif text-[1.25rem] leading-none text-[#203B35] tabular-nums mr-1.5">
-                  {profile.projects.length}
+                  {projectsCount ?? profile.projects.length}
                 </span>
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#5D635F]">
                   Works
@@ -342,6 +290,19 @@ export function ProfileHeroSection({
                 </span>
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#5D635F]">
                   Posts
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSelectShowcaseTab("ideas")}
+                className="rounded-xl border border-[#203B35]/10 bg-[#F6F3EB] px-3.5 py-2 text-left hover:border-[#203B35]/30 transition-colors"
+              >
+                <span className="font-serif text-[1.25rem] leading-none text-[#203B35] tabular-nums mr-1.5">
+                  {profile.ideas.length}
+                </span>
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#5D635F]">
+                  Ideas
                 </span>
               </button>
 

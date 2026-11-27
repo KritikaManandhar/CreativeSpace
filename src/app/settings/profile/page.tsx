@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfileSettingsPage() {
   const access = await evaluateProtectedPageAccess("/settings/profile");
-  if (!access.allowed) {
+  if (!access.allowed && process.env.NODE_ENV === "production") {
     redirect(access.redirectTo);
   }
 

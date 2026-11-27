@@ -19,15 +19,17 @@ import { formatReadableUrl, getSocialIcon } from "./profileIcons";
 interface ProfileAboutTabProps {
   profile: UserProfileRecord;
   perspective: ProfilePerspective;
+  projectsCount?: number;
   publishedServicesCount: number;
   onOpenEditModal: () => void;
-  onSelectTab: (tab: "works" | "services" | "posts" | "about") => void;
+  onSelectTab: (tab: "works" | "services" | "posts" | "ideas" | "about") => void;
   onOpenSocialModal: (tab: "followers" | "following") => void;
 }
 
 export function ProfileAboutTab({
   profile,
   perspective,
+  projectsCount,
   publishedServicesCount,
   onOpenEditModal,
   onSelectTab,
@@ -131,7 +133,7 @@ export function ProfileAboutTab({
               className="group rounded-xl border border-[#203B35]/10 bg-[#F6F3EB]/85 p-3.5 text-left hover:border-[#203B35]/30 transition-colors"
             >
               <p className="font-serif text-[1.75rem] leading-none text-[#203B35] tabular-nums">
-                {profile.projects.length}
+                {projectsCount ?? profile.projects.length}
               </p>
               <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#5D635F] group-hover:text-[#203B35]">
                 Works
@@ -166,6 +168,19 @@ export function ProfileAboutTab({
 
             <button
               type="button"
+              onClick={() => onSelectTab("ideas")}
+              className="group rounded-xl border border-[#203B35]/10 bg-[#F6F3EB]/85 p-3.5 text-left hover:border-[#203B35]/30 transition-colors"
+            >
+              <p className="font-serif text-[1.75rem] leading-none text-[#203B35] tabular-nums">
+                {profile.ideas.length}
+              </p>
+              <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#5D635F] group-hover:text-[#203B35]">
+                Ideas
+              </p>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onOpenSocialModal("followers")}
               className="group rounded-xl border border-[#203B35]/10 bg-[#F6F3EB]/85 p-3.5 text-left hover:border-[#203B35]/30 transition-colors"
             >
@@ -190,13 +205,13 @@ export function ProfileAboutTab({
               </p>
             </button>
 
-            <div className="rounded-xl border border-[#203B35]/10 bg-[#F6F3EB]/85 p-3.5">
-              <p className="font-serif text-[1.75rem] leading-none text-[#203B35] tabular-nums">
-                {profile.stats.totalLikes.toLocaleString()}
+            <div className="col-span-2 sm:col-span-3 flex items-center justify-between rounded-xl border border-[#203B35]/10 bg-[#F6F3EB]/85 p-3.5">
+              <p className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#5D635F]">
+                <Heart className="h-3.5 w-3.5 text-[#9DB5A5]" />
+                <span>Total Appreciations</span>
               </p>
-              <p className="mt-1.5 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#5D635F]">
-                <Heart className="h-3 w-3 text-[#9DB5A5]" />
-                <span>Appreciations</span>
+              <p className="font-serif text-[1.5rem] leading-none text-[#203B35] tabular-nums">
+                {profile.stats.totalLikes.toLocaleString()}
               </p>
             </div>
           </div>
@@ -242,15 +257,17 @@ export function ProfileAboutTab({
               </dd>
             </div>
 
-            <div className="flex items-center justify-between gap-4 py-3">
-              <dt className="inline-flex items-center gap-2 text-[#5D635F]">
-                <Users className="h-4 w-4 text-[#9DB5A5]" />
-                <span>Collaborations</span>
-              </dt>
-              <dd className="font-medium text-[#203B35] text-right">
-                {profile.openToCollab ? "Open to collaborate" : "Focused studio"}
-              </dd>
-            </div>
+            {perspective === "owner" && (
+              <div className="flex items-center justify-between gap-4 py-3">
+                <dt className="inline-flex items-center gap-2 text-[#5D635F]">
+                  <Users className="h-4 w-4 text-[#9DB5A5]" />
+                  <span>Collaborations</span>
+                </dt>
+                <dd className="font-medium text-[#203B35] text-right">
+                  {profile.openToCollab ? "Open to collaborate" : "Focused studio"}
+                </dd>
+              </div>
+            )}
 
             {profile.studioStatus && (
               <div className="flex items-start justify-between gap-4 py-3 last:pb-0">
