@@ -1,50 +1,204 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MotionConfig, AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, Sparkles, X } from "lucide-react";
-import type { ViewerConnectionState } from "@/lib/features/profile";
+import { Eye, PencilLine, RotateCcw, Sparkles, X } from "lucide-react";
 import {
+  deriveInitials,
   resolveMockProfile,
+  SAMPLE_PROFILE_LINKS,
   type ProfilePerspective,
   type ProfilePostComment,
   type ProfilePostItem,
-  type ProfileProjectItem,
   type ProfileServiceItem,
   type UserProfileRecord,
 } from "@/data/mockProfiles";
-import { ProfileNavbar } from "./ProfileNavbar";
+import { AuthenticatedNavbar } from "@/components/navigation/AuthenticatedNavbar";
 import { ProfileHeroSection } from "./ProfileHeroSection";
 import { ProfileShowcaseTabs, type ProfileTab } from "./ProfileShowcaseTabs";
 import { EditProfileModal } from "./EditProfileModal";
-import {
-  CollaboratePreviewModal,
-  ProjectPreviewModal,
-  SocialNetworkModal,
-} from "./ProfileModals";
+import { SocialNetworkModal } from "./ProfileModals";
+import type { ProfileDisplayProject } from "./ProfileProjectCard";
+import { ProjectDetailModal } from "./ProjectDetailModal";
 import { ServiceDetailModal } from "./ServiceDetailModal";
 import { ProfileFooter } from "./ProfileFooter";
+import {
+  getStoredProjects,
+  subscribeToProjects,
+  toProfileDisplayProject,
+} from "@/lib/projectStore";
+
+export interface InitialCreatorPortfolioData {
+  foundInDb: boolean;
+  creator: {
+    id: string;
+    username: string;
+    displayName: string;
+    bio: string | null;
+    avatarUrl: string | null;
+    disciplines: string[];
+    socialLinks: Record<string, string>;
+    joinedAt: string;
+    stats: {
+      createdProjects: number;
+      followers: number;
+      following: number;
+      collaborations: number;
+    };
+  } | null;
+  isFollowing: boolean;
+  projects: ProfileDisplayProject[];
+}
 
 interface ProfilePageClientProps {
   username: string;
+  initialTab?: string;
+  initialServiceId?: string;
+  initialAction?: string;
+  initialPortfolio?: InitialCreatorPortfolioData | null;
+  portfolioError?: string | null;
 }
 
-export function ProfilePageClient({ username }: ProfilePageClientProps) {
-  const [profile, setProfile] = useState<UserProfileRecord>(() =>
-    resolveMockProfile(username)
+function formatJoinedLabel(rawDate: string | null | undefined, fallback: string): string {
+  if (!rawDate) return fallback;
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return `Joined ${date.toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
+function resolveProfileProjects(
+  username: string,
+  initialPortfolio?: InitialCreatorPortfolioData | null
+): ProfileDisplayProject[] {
+  if (initialPortfolio?.foundInDb && initialPortfolio.projects.length > 0) {
+    return initialPortfolio.projects;
+  }
+  const stored = getStoredProjects(username);
+  const published = stored.filter((p) => p.isPublished !== false);
+  return published.map((p) => toProfileDisplayProject(p));
+}
+
+function buildHydratedProfile(
+  username: string,
+  initialPortfolio?: InitialCreatorPortfolioData | null
+): UserProfileRecord {
+  const base = resolveMockProfile(username);
+  const resolvedProjects = resolveProfileProjects(username, initialPortfolio);
+
+  if (!initialPortfolio?.foundInDb || !initialPortfolio.creator) {
+    return {
+      ...base,
+      projects: base.projects,
+      stats: {
+        ...base.stats,
+        projects: resolvedProjects.length,
+      },
+    };
+  }
+
+  const creator = initialPortfolio.creator;
+  const totalDbLikes = initialPortfolio.projects.reduce(
+    (sum, item) => sum + item.likeCount,
+    0
   );
+
+  return {
+    ...base,
+    id: creator.id,
+    username: creator.username,
+    displayName: creator.displayName,
+    avatarInitials: deriveInitials(creator.displayName),
+    bio: creator.bio ?? "",
+    avatarUrl: creator.avatarUrl ?? null,
+    joinedAt: formatJoinedLabel(creator.joinedAt, base.joinedAt),
+    disciplines:
+      creator.disciplines.length > 0 ? creator.disciplines : base.disciplines,
+    socialLinks: creator.socialLinks,
+    stats: {
+      ...base.stats,
+      projects: initialPortfolio.projects.length,
+      followers: creator.stats.followers,
+      following: creator.stats.following,
+      collaborations: creator.stats.collaborations,
+      totalLikes: totalDbLikes,
+    },
+  };
+}
+
+function buildInitialLikesMap(projects: ProfileDisplayProject[]): Record<string, boolean> {
+  const map: Record<string, boolean> = {};
+  for (const proj of projects) {
+    if (proj.hasLiked) {
+      map[proj.id] = true;
+    }
+  }
+  return map;
+}
+
+export function ProfilePageClient({
+  username,
+  initialTab,
+  initialServiceId,
+  initialAction,
+  initialPortfolio = null,
+  portfolioError = null,
+}: ProfilePageClientProps) {
+  const router = useRouter();
+  const [profile, setProfile] = useState<UserProfileRecord>(() =>
+    buildHydratedProfile(username, initialPortfolio)
+  );
+  const [dbProjects, setDbProjects] = useState<ProfileDisplayProject[]>(
+    () => resolveProfileProjects(username, initialPortfolio)
+  );
+
+  // Subscribe to persistent project updates
+  useEffect(() => {
+    const unsubscribe = subscribeToProjects(() => {
+      if (!initialPortfolio?.foundInDb) {
+        const next = resolveProfileProjects(username, initialPortfolio);
+        setDbProjects(next);
+        setProfile((prev) => ({
+          ...prev,
+          stats: {
+            ...prev.stats,
+            projects: next.length,
+          },
+        }));
+      }
+    });
+    return unsubscribe;
+  }, [username, initialPortfolio]);
+
   const [perspective, setPerspective] = useState<ProfilePerspective>(
     () => resolveMockProfile(username).defaultPerspective
   );
-  const [activeTab, setActiveTab] = useState<ProfileTab>("works");
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
+    if (
+      initialTab === "services" ||
+      initialTab === "works" ||
+      initialTab === "posts" ||
+      initialTab === "ideas" ||
+      initialTab === "about"
+    ) {
+      return initialTab;
+    }
+    return "works";
+  });
 
   // Visitor interactive states (local-only)
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [connectionState, setConnectionState] =
-    useState<ViewerConnectionState>("none");
+  const [isFollowing, setIsFollowing] = useState(
+    () => Boolean(initialPortfolio?.isFollowing)
+  );
 
   // Showcase interactive states (local-only)
-  const [likedProjectIds, setLikedProjectIds] = useState<Record<string, boolean>>({});
+  const [likedProjectIds, setLikedProjectIds] = useState<Record<string, boolean>>(() =>
+    buildInitialLikesMap(initialPortfolio?.projects ?? [])
+  );
   const [savedProjectIds, setSavedProjectIds] = useState<Record<string, boolean>>({});
   const [likedPostIds, setLikedPostIds] = useState<Record<string, boolean>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
@@ -55,10 +209,38 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
     "followers" | "following" | null
   >(null);
   const [selectedProject, setSelectedProject] =
-    useState<ProfileProjectItem | null>(null);
-  const [selectedService, setSelectedService] =
-    useState<ProfileServiceItem | null>(null);
-  const [collaborateOpen, setCollaborateOpen] = useState(false);
+    useState<ProfileDisplayProject | null>(null);
+  const [selectedService, setSelectedService] = useState<ProfileServiceItem | null>(
+    () => {
+      if (initialServiceId) {
+        const initialProfile = resolveMockProfile(username);
+        const match = initialProfile.services.find((s) => s.id === initialServiceId);
+        if (
+          match &&
+          (match.isPublished || initialProfile.defaultPerspective === "owner")
+        ) {
+          return match;
+        }
+      }
+      return null;
+    }
+  );
+  const [serviceInitialMode, setServiceInitialMode] = useState<
+    "details" | "booking"
+  >(() => {
+    return initialAction === "book" || initialAction === "booking"
+      ? "booking"
+      : "details";
+  });
+
+  const handleSelectService = (
+    service: ProfileServiceItem,
+    mode: "details" | "booking" = "details"
+  ) => {
+    setSelectedService(service);
+    setServiceInitialMode(mode);
+  };
+
   const [copiedLink, setCopiedLink] = useState(false);
   const [hasLocalEdits, setHasLocalEdits] = useState(false);
   const [previewNotice, setPreviewNotice] = useState<string | null>(null);
@@ -68,23 +250,51 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
   // Sync when navigating between `/profile/[username]` routes
   useEffect(() => {
     const fresh = resolveMockProfile(username);
-    setProfile(fresh);
+    setProfile(buildHydratedProfile(username, initialPortfolio));
     setPerspective(fresh.defaultPerspective);
-    setActiveTab("works");
-    setIsFollowing(false);
-    setConnectionState("none");
-    setLikedProjectIds({});
+    if (
+      initialTab === "services" ||
+      initialTab === "works" ||
+      initialTab === "posts" ||
+      initialTab === "ideas" ||
+      initialTab === "about"
+    ) {
+      setActiveTab(initialTab);
+    } else {
+      setActiveTab("works");
+    }
+    const nextProjects = resolveProfileProjects(username, initialPortfolio);
+    setDbProjects(nextProjects);
+    setIsFollowing(Boolean(initialPortfolio?.isFollowing));
+    setLikedProjectIds(buildInitialLikesMap(nextProjects));
     setSavedProjectIds({});
     setLikedPostIds({});
     setSavedPostIds({});
     setEditModalOpen(false);
     setSocialModalTab(null);
     setSelectedProject(null);
-    setSelectedService(null);
-    setCollaborateOpen(false);
+
+    if (initialServiceId) {
+      const match = fresh.services.find((s) => s.id === initialServiceId);
+      if (match && (match.isPublished || fresh.defaultPerspective === "owner")) {
+        setSelectedService(match);
+        setServiceInitialMode(
+          initialAction === "book" || initialAction === "booking"
+            ? "booking"
+            : "details"
+        );
+      } else {
+        setSelectedService(null);
+        setServiceInitialMode("details");
+      }
+    } else {
+      setSelectedService(null);
+      setServiceInitialMode("details");
+    }
+
     setHasLocalEdits(false);
     setPreviewNotice(null);
-  }, [username]);
+  }, [username, initialTab, initialServiceId, initialAction, initialPortfolio]);
 
   // Ensure unpublished services close immediately if switching from Owner -> Visitor
   useEffect(() => {
@@ -104,14 +314,6 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
         },
       }));
       return next;
-    });
-  };
-
-  const handleToggleConnect = () => {
-    setConnectionState((prev) => {
-      if (prev === "none") return "pending_outgoing";
-      if (prev === "pending_outgoing") return "accepted";
-      return "none";
     });
   };
 
@@ -143,8 +345,7 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
   };
 
   const handleResetEdits = () => {
-    const fresh = resolveMockProfile(username);
-    setProfile(fresh);
+    setProfile(buildHydratedProfile(username, initialPortfolio));
     setHasLocalEdits(false);
     setPreviewNotice(null);
   };
@@ -233,15 +434,93 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           <div className="absolute top-[22%] -left-28 h-[380px] w-[380px] rounded-full bg-[#9DB5A5]/15 blur-[110px]" />
         </div>
 
-        {/* Sticky Editorial Top Navigation */}
-        <ProfileNavbar
-          activeUsername={profile.username}
-          perspective={perspective}
-          onPerspectiveChange={setPerspective}
-        />
+        {/* Shared Consistent Authenticated Top Navigation */}
+        <AuthenticatedNavbar />
 
         {/* Main Profile Container */}
         <main className="relative z-10 mx-auto w-full max-w-[1320px] flex-1 px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8">
+          {/* Profile-Specific Perspective (Owner View / Visitor View) Control Toolbar */}
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] px-4 sm:px-5 py-3 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EFECE2] text-[#203B35]">
+                <Eye className="h-3.5 w-3.5 text-[#203B35]" />
+              </div>
+              <div>
+                <span className="text-[13px] font-medium text-[#203B35]">
+                  Profile Perspective
+                </span>
+                <span className="hidden md:inline text-[12px] text-[#5D635F] ml-2">
+                  — Viewing as{" "}
+                  <strong className="font-medium text-[#203B35]">
+                    {perspective === "owner"
+                      ? "Owner (Full Studio Controls)"
+                      : "Public Visitor"}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Sample Profiles Quick Jump (for previewing multiple creators) */}
+              <div className="hidden lg:flex items-center gap-1.5 text-[11.5px] text-[#5D635F] border-r border-[#203B35]/10 pr-3 mr-1">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-[#92958F]">
+                  Switch:
+                </span>
+                {SAMPLE_PROFILE_LINKS.map((sample) => {
+                  const isCurrent =
+                    sample.username.toLowerCase() === profile.username.toLowerCase();
+                  return (
+                    <Link
+                      key={sample.username}
+                      href={`/profile/${sample.username}`}
+                      className={`rounded-full px-2 py-0.5 transition-colors ${
+                        isCurrent
+                          ? "bg-[#203B35] text-[#F6F3EB] font-medium"
+                          : "hover:bg-[#EFECE2] text-[#282B2A]/80 hover:text-[#203B35]"
+                      }`}
+                    >
+                      @{sample.username}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Owner View / Visitor View Switcher Group */}
+              <div
+                className="inline-flex items-center rounded-full border border-[#203B35]/15 bg-[#F6F3EB] p-1 self-start sm:self-auto"
+                role="group"
+                aria-label="Profile perspective view switcher"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPerspective("owner")}
+                  aria-pressed={perspective === "owner"}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+                    perspective === "owner"
+                      ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
+                      : "text-[#5D635F] hover:text-[#203B35]"
+                  }`}
+                >
+                  <PencilLine className="h-3 w-3" />
+                  <span>Owner View</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPerspective("visitor")}
+                  aria-pressed={perspective === "visitor"}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#203B35]/40 ${
+                    perspective === "visitor"
+                      ? "bg-[#203B35] text-[#F6F3EB] shadow-sm"
+                      : "text-[#5D635F] hover:text-[#203B35]"
+                  }`}
+                >
+                  <Eye className="h-3 w-3" />
+                  <span>Visitor View</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Calm Local Preview Status Banner (when preview edits exist) */}
           <AnimatePresence>
             {(previewNotice || hasLocalEdits) && (
@@ -290,26 +569,28 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           <ProfileHeroSection
             profile={profile}
             perspective={perspective}
+            projectsCount={dbProjects.length}
             publishedServicesCount={publishedServicesCount}
             isFollowing={isFollowing}
-            connectionState={connectionState}
             copiedLink={copiedLink}
             onOpenEditModal={() => setEditModalOpen(true)}
             onToggleFollow={handleToggleFollow}
-            onToggleConnect={handleToggleConnect}
-            onOpenCollaborate={() => setCollaborateOpen(true)}
             onCopyShareLink={handleCopyShareLink}
             onPerspectiveChange={setPerspective}
             onSelectShowcaseTab={handleSelectShowcaseTab}
             onOpenSocialModal={(tab) => setSocialModalTab(tab)}
           />
 
-          {/* Works, Services, Posts & About Sections */}
+          {/* Works, Services, Posts, Ideas & About Sections */}
           <ProfileShowcaseTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
             perspective={perspective}
             profile={profile}
+            projects={dbProjects}
+            projectsLoading={false}
+            projectsError={portfolioError}
+            onRetryProjects={() => router.refresh()}
             publishedServicesCount={publishedServicesCount}
             likedProjectIds={likedProjectIds}
             savedProjectIds={savedProjectIds}
@@ -318,7 +599,7 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
             onToggleProjectLike={handleToggleProjectLike}
             onToggleProjectSave={handleToggleProjectSave}
             onSelectProject={setSelectedProject}
-            onSelectService={setSelectedService}
+            onSelectService={handleSelectService}
             onTogglePostLike={handleTogglePostLike}
             onTogglePostSave={handleTogglePostSave}
             onAddPostComment={handleAddPostComment}
@@ -328,10 +609,10 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           />
         </main>
 
-        {/* Footer */}
+        {/* Profile Footer */}
         <ProfileFooter />
 
-        {/* Edit Profile Modal (Frontend-only state preview) */}
+        {/* Profile Interactive Modals */}
         <EditProfileModal
           isOpen={editModalOpen}
           profile={profile}
@@ -339,41 +620,38 @@ export function ProfilePageClient({ username }: ProfilePageClientProps) {
           onApplyChanges={handleApplyProfileEdits}
         />
 
-        {/* Followers / Following Directory Modal */}
         <SocialNetworkModal
-          isOpen={socialModalTab !== null}
-          initialTab={socialModalTab ?? "followers"}
+          isOpen={Boolean(socialModalTab)}
+          initialTab={socialModalTab || "followers"}
           displayName={profile.displayName}
           followers={profile.followersList}
           following={profile.followingList}
           onClose={() => setSocialModalTab(null)}
         />
 
-        {/* Project Detail & Process History Modal */}
-        <ProjectPreviewModal
+        <ProjectDetailModal
           project={selectedProject}
-          isLiked={selectedProject ? Boolean(likedProjectIds[selectedProject.id]) : false}
-          isSaved={selectedProject ? Boolean(savedProjectIds[selectedProject.id]) : false}
+          relatedProjects={dbProjects}
+          creatorFallback={{
+            id: profile.id,
+            username: profile.username,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            bio: profile.bio,
+            disciplines: profile.disciplines,
+          }}
+          perspective={perspective}
+          onSelectRelatedProject={(nextProject) => setSelectedProject(nextProject)}
           onClose={() => setSelectedProject(null)}
-          onToggleLike={handleToggleProjectLike}
-          onToggleSave={handleToggleProjectSave}
         />
 
-        {/* Service Details & Request Booking Preview Modal */}
         <ServiceDetailModal
           service={selectedService}
           providerName={profile.displayName}
           providerUsername={profile.username}
           perspective={perspective}
+          initialMode={serviceInitialMode}
           onClose={() => setSelectedService(null)}
-        />
-
-        {/* Collaborate Invitation Preview Modal */}
-        <CollaboratePreviewModal
-          isOpen={collaborateOpen}
-          recipientName={profile.displayName}
-          recipientUsername={profile.username}
-          onClose={() => setCollaborateOpen(false)}
         />
       </div>
     </MotionConfig>
