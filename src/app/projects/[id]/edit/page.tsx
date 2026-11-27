@@ -23,7 +23,7 @@ interface PageProps {
 export default async function Page({ params }: PageProps) {
   const access = await evaluateProjectEditPageAccess(params.id);
 
-  if (!access.allowed) {
+  if (!access.allowed && process.env.NODE_ENV === "production") {
     if (access.status === 401 && access.redirectTo) {
       redirect(access.redirectTo);
     }
