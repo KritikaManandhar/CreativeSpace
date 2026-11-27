@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -12,6 +12,7 @@ import {
   Menu,
   PencilLine,
   Plus,
+  Search,
   Settings,
   User,
   X,
@@ -22,12 +23,19 @@ import {
 } from "@/components/landing/CreativeSpaceBrand";
 import { MOCK_PROFILES, deriveInitials } from "@/data/mockProfiles";
 import { FeedAvatar } from "@/components/feed/FeedAvatar";
+import { BookingFloatingMessenger } from "@/components/messaging/BookingFloatingMessenger";
 
 export interface AuthenticatedNavbarProps {
   /** Optional override for pages wanting explicit active nav feedback */
   activeNav?: "home" | "explore" | "ideas" | "dashboard";
   /** Optional handler to open the post creation modal directly from the navbar */
   onCreatePost?: () => void;
+  /** Optional search query value if controlled by a page (e.g. Explore) */
+  searchQuery?: string;
+  /** Optional callback when search input changes */
+  onSearchChange?: (query: string) => void;
+  /** Optional callback when search is submitted */
+  onSearchSubmit?: (query: string) => void;
 }
 
 interface NavDestination {
@@ -55,22 +63,65 @@ function resolveActiveKey(
 
 /**
  * Shared authenticated navigation bar styled in CreativeSpace's cream-and-forest editorial palette.
- * Used across the authenticated Community Feed home page and ready for reuse in upcoming internal pages.
+ * Used consistently across Home, Explore, Dashboard, and Profile pages.
  */
 export function AuthenticatedNavbar({
   activeNav,
   onCreatePost,
+  searchQuery,
+  onSearchChange,
+  onSearchSubmit,
 }: AuthenticatedNavbarProps) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const { data: session, status } = useSession();
 
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [internalSearch, setInternalSearch] = useState(searchQuery || "");
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (searchQuery !== undefined) {
+      setInternalSearch(searchQuery);
+    }
+  }, [searchQuery]);
+
+  const currentSearchValue =
+    searchQuery !== undefined ? searchQuery : internalSearch;
+
+  const handleSearchInputChange = (value: string) => {
+    setInternalSearch(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setMobileOpen(false);
+    const trimmed = currentSearchValue.trim();
+    if (onSearchSubmit) {
+      onSearchSubmit(trimmed);
+    } else {
+      if (trimmed) {
+        router.push(`/explore?q=${encodeURIComponent(trimmed)}`);
+      } else {
+        router.push("/explore");
+      }
+    }
+  };
+
+  const handleClearSearch = () => {
+    handleSearchInputChange("");
+    if (onSearchSubmit) {
+      onSearchSubmit("");
+    }
+  };
 
   const isAuthenticated = status === "authenticated" && Boolean(session?.user?.id);
   const defaultPreviewUser = MOCK_PROFILES.anya_art;
@@ -163,35 +214,74 @@ export function AuthenticatedNavbar({
           </span>
         </Link>
 
-        {/* Center: Primary Authenticated Links (md+) */}
-        <nav
-          className="hidden md:flex items-center gap-5 lg:gap-8"
-          aria-label="Authenticated workspace navigation"
-        >
-          {navLinks.map((item) => {
-            const isActive = currentActiveKey === item.key;
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`relative py-1.5 text-[14px] font-medium transition-colors rounded-sm ${FOCUS_RING} ${
-                  isActive
-                    ? "text-[#203B35]"
-                    : "text-[#282B2A]/75 hover:text-[#203B35]"
-                }`}
-              >
-                <span>{item.label}</span>
-                {isActive && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-[#203B35]"
-                  />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Center: Primary Authenticated Links & Compact Global Search (md+) */}
+        <div className="hidden md:flex items-center gap-4 lg:gap-7">
+          <nav
+            className="flex items-center gap-5 lg:gap-7"
+            aria-label="Authenticated workspace navigation"
+          >
+            {navLinks.map((item) => {
+              const isActive = currentActiveKey === item.key;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`relative py-1.5 text-[14px] font-medium transition-colors rounded-sm ${FOCUS_RING} ${
+                    isActive
+                      ? "text-[#203B35]"
+                      : "text-[#282B2A]/75 hover:text-[#203B35]"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-[#203B35]"
+                    />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Compact Global Search Input (md+) */}
+          <form
+            onSubmit={handleSearchSubmit}
+            role="search"
+            aria-label="Global search across creators, projects, posts, and services"
+            className="relative flex items-center"
+          >
+            <div className="relative flex items-center rounded-full border border-[#203B35]/15 bg-[#FAF8F3] pl-2.5 pr-2 py-1.5 focus-within:border-[#203B35]/40 focus-within:ring-2 focus-within:ring-[#203B35]/10 w-36 md:w-44 lg:w-56 xl:w-64 transition-all duration-200">
+              <Search className="h-3.5 w-3.5 text-[#5D635F] shrink-0 mr-1.5" />
+              <input
+                type="text"
+                value={currentSearchValue}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
+                placeholder="Search creators, works..."
+                aria-label="Search creators, projects, posts, and services"
+                className="w-full bg-transparent text-[12.5px] lg:text-[13px] text-[#282B2A] placeholder-[#5D635F]/70 focus:outline-none"
+              />
+              {currentSearchValue ? (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  aria-label="Clear search input"
+                  className="text-[#5D635F] hover:text-[#203B35] p-0.5 ml-1 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              ) : (
+                <span
+                  className="hidden lg:inline text-[9.5px] font-mono text-[#92958F] px-1 py-0.2 rounded bg-[#EFECE2]/70 ml-1 select-none"
+                  aria-hidden="true"
+                >
+                  ↵
+                </span>
+              )}
+            </div>
+          </form>
+        </div>
 
         {/* Right: Create Action, Notifications & User Dropdown */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -389,7 +479,7 @@ export function AuthenticatedNavbar({
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="md:hidden overflow-hidden border-t border-[#203B35]/10 bg-[#F6F3EB]"
           >
-            <div className="px-4 sm:px-8 py-5 space-y-5">
+            <div className="px-4 sm:px-8 py-5 space-y-4">
               {/* Mobile Identity Card */}
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#203B35]/12 bg-[#FAF8F3] p-3.5">
                 <div className="flex items-center gap-3 min-w-0">
@@ -424,6 +514,33 @@ export function AuthenticatedNavbar({
                   </button>
                 )}
               </div>
+
+              {/* Mobile Compact Search Form */}
+              <form
+                onSubmit={handleSearchSubmit}
+                role="search"
+                aria-label="Mobile global search"
+                className="relative flex items-center rounded-full border border-[#203B35]/15 bg-[#FAF8F3] px-3.5 py-2"
+              >
+                <Search className="h-4 w-4 text-[#5D635F] mr-2 shrink-0" />
+                <input
+                  type="text"
+                  value={currentSearchValue}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
+                  placeholder="Search creators, works, posts, services..."
+                  className="w-full bg-transparent text-[13px] text-[#282B2A] placeholder-[#5D635F]/75 focus:outline-none"
+                />
+                {currentSearchValue && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    aria-label="Clear mobile search"
+                    className="text-[#5D635F] hover:text-[#203B35] p-1 ml-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </form>
 
               {/* Primary Routes */}
               <nav aria-label="Mobile workspace links" className="grid grid-cols-2 gap-2">
@@ -486,6 +603,9 @@ export function AuthenticatedNavbar({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Persistent Floating Messaging Launcher & Compact Booking Inbox */}
+      <BookingFloatingMessenger />
     </header>
   );
 }
