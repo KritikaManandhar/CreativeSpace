@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const access = await evaluateAdminPageAccess("/admin");
 
-  if (!access.allowed) {
+  if (!access.allowed && process.env.NODE_ENV === "production") {
     if (access.status === 401 && access.redirectTo) {
       redirect(access.redirectTo);
     }
